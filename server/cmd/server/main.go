@@ -10,7 +10,11 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/neuro-soup/evochi/server/internal/event"
+	"github.com/neuro-soup/evochi/server/internal/worker"
 	_ "github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1/evochiv1connect"
+	"github.com/neuro-soup/evochi/server/pkg/service"
 )
 
 func main() {
@@ -19,7 +23,15 @@ func main() {
 	}))
 	slog.SetDefault(log)
 
+	workers := worker.NewPool()
+	go workers.GarbageCollect(workerTimeout)
+
+	events := event.NewQueue()
+
+	handler := service.NewHandler(workers, events)
+
 	mux := http.NewServeMux()
+	mux.Handle(evochiv1connect.NewEvochiServiceHandler(handler))
 	mux.Handle("/metrics", promhttp.Handler())
 
 	slog.Info("starting server", "port", port)

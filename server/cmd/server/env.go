@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -14,6 +15,9 @@ var (
 
 	// port is the HTTP port to listen on.
 	port uint = portFromEnv()
+
+	// workerTimeout is the timeout for a worker.
+	workerTimeout = workerTimeoutFromEnv()
 )
 
 // logLevelFromEnv returns the log level to use from the environment.
@@ -43,4 +47,16 @@ func portFromEnv() uint {
 		log.Fatal(err)
 	}
 	return uint(port)
+}
+
+func workerTimeoutFromEnv() time.Duration {
+	workerTimeoutStr := os.Getenv("EVOCHI_WORKER_TIMEOUT")
+	if workerTimeoutStr == "" {
+		return 1 * time.Minute
+	}
+	workerTimeout, err := time.ParseDuration(workerTimeoutStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return workerTimeout
 }

@@ -3,7 +3,9 @@ package worker
 import (
 	"fmt"
 	"iter"
+	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +31,8 @@ type Pool struct {
 // NewPool creates a new empty worker pool.
 func NewPool() *Pool {
 	return &Pool{
-		mu: new(sync.RWMutex),
+		mu:   new(sync.RWMutex),
+		pool: make(map[uuid.UUID]*Worker),
 	}
 }
 
@@ -84,5 +87,25 @@ func (p *Pool) Iter() iter.Seq[*Worker] {
 				return
 			}
 		}
+	}
+}
+
+// GarbageCollect periodically removes workers that were idle for too long.
+func (p *Pool) GarbageCollect(timeout time.Duration) {
+	for {
+		now := time.Now()
+
+		p.mu.Lock()
+		for _, w := range p.pool {
+			if now.Sub(w.LastSeen) < timeout {
+				continue
+			}
+
+			slog.Debug("removing idle worker", "id", w.ID)
+			delete(p.pool, w.ID)
+		}
+		p.mu.Unlock()
+
+		time.Sleep(timeout)
 	}
 }

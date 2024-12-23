@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package evochi.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_HELLO = 1;
+}
+
+message HelloEvent {
+  // the id assigned to the worker
+  string id = 1;
+}
+
+message SubscribeRequest {
+  // number of cores that the worker contributes to the evaluation
+  int32 cores = 1;
+
+  // custom attributes set by the worker
+  map<string, bytes> attrs = 2;
+}
+
+message SubscribeResponse {
+  // the type of event
+  EventType type = 1;
+
+  // the event data
+  oneof event {
+    HelloEvent hello = 2;
+  }
+}
+
+message HeartbeatRequest {
+  // the sequence id of the heartbeat
+  int32 seq_id = 1;
+
+  // the time when the heartbeat was sent
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message HeartbeatResponse {
+  // whether the heartbeat was successful
+  bool ok = 1;
+}
+
+service EvochiService {
+  // join the work force and subscribe to events
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
+
+  // send heartbeat to the server to keep the connection alive
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+}

@@ -17,5 +17,5 @@ func (h *Handler) FinishEvaluation(
 		"rewards", len(req.Msg.Rewards),
 	)
 
-	panic("unimplemented") // TODO: implement
+	panic("unimplemented") // TODO: implement a
 }

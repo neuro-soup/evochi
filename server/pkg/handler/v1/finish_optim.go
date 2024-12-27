@@ -13,7 +13,8 @@ func (h *Handler) FinishOptimization(
 	req *connect.Request[evochiv1.FinishOptimizationRequest],
 ) (*connect.Response[evochiv1.FinishOptimizationResponse], error) {
 	slog.Debug("handling finish optimization request",
-		"state_size", len(req.Msg.State),
+		"task", req.Msg.TaskId,
+		"state", len(req.Msg.State),
 	)
 
 	panic("unimplemented") // TODO: implement

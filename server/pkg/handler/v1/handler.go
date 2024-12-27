@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"time"
+
 	"github.com/neuro-soup/evochi/server/internal/epoch"
 	"github.com/neuro-soup/evochi/server/internal/event"
 	"github.com/neuro-soup/evochi/server/internal/worker"
@@ -15,17 +17,25 @@ type Config struct {
 	// no limit.
 	MaxWorkers uint
 
+	// WorkerTimeout is the timeout for a worker. Defaults to 1 minute.
+	WorkerTimeout time.Duration `split_words:"true" default:"1m"`
+
 	// MaxEpochs is the maximum number of epochs to process. If zero, there is
 	// no limit.
 	MaxEpochs uint
+
+	// PopulationSize is the size of the population to use.
+	PopulationSize uint
+
+	// Attrs are the custom attributes to use.
+	Attrs map[string][]byte
 }
 
 type Handler struct {
-	config Config
+	cfg Config
 
 	workers *worker.Pool
 	events  *event.Queue
-	conns   *connections
 
 	// epoch is the current epoch.
 	epoch *epoch.Epoch
@@ -36,9 +46,8 @@ var _ evochiv1connect.EvochiServiceHandler = (*Handler)(nil)
 // New creates a new handler.
 func New(config Config, workers *worker.Pool, events *event.Queue) *Handler {
 	return &Handler{
-		config:  config,
+		cfg:     config,
 		workers: workers,
 		events:  events,
-		conns:   newConnections(),
 	}
 }

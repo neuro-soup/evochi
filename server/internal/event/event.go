@@ -27,8 +27,8 @@ type Hello struct {
 func (Hello) isEvent() {}
 
 type Evaluate struct {
-	// EvalID is the identifier of the evaluation.
-	EvalID uuid.UUID
+	// TaskID is the identifier of the evaluation.
+	TaskID uuid.UUID
 
 	// Slices is the slices to be evaluated.
 	Slices []epoch.Slice
@@ -37,6 +37,9 @@ type Evaluate struct {
 func (Evaluate) isEvent() {}
 
 type Optimize struct {
+	// TaskID is the identifier of the evaluation.
+	TaskID uuid.UUID
+
 	// Epoch is the current epoch.
 	Epoch uint
 

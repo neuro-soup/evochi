@@ -2,8 +2,9 @@ package worker
 
 import (
 	"fmt"
-	"iter"
+	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -69,21 +70,31 @@ func (p *Pool) Remove(w *Worker) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	delete(p.pool, w.ID)
-
-	workersRemoved.Inc()
+	p.remove(w)
 }
 
-// Iter iterates over the workers in the pool.
-func (p *Pool) Iter() iter.Seq[*Worker] {
-	return func(yield func(*Worker) bool) {
-		p.mu.RLock()
-		defer p.mu.RUnlock()
+// remove removes the worker from the pool without locking.
+func (p *Pool) remove(w *Worker) {
+	delete(p.pool, w.ID)
+	workersRemoved.Inc()
 
+	w.Remove()
+}
+
+// Watch watches the pool for unproductive workers and removes them.
+func (p *Pool) Watch(sleep time.Duration) {
+	for {
+		p.mu.Lock()
 		for _, w := range p.pool {
-			if !yield(w) {
-				return
+			if w.Tasks.Punctual() {
+				continue
 			}
+
+			slog.Info("removing unproductive worker", "worker", w.ID)
+			p.remove(w)
 		}
+		p.mu.Unlock()
+
+		time.Sleep(sleep)
 	}
 }

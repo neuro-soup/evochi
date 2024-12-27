@@ -22,7 +22,7 @@ func (c *Claims) Admin() bool {
 
 // jwtKey returns the key used to verify the JWT token.
 func (h *Handler) jwtKey(t *jwt.Token) (any, error) {
-	return []byte(h.config.JWTSecret), nil
+	return []byte(h.cfg.JWTSecret), nil
 }
 
 // authenticate reads the JWT token from the "Authorization" header (Bearer)

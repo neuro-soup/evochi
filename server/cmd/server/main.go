@@ -13,36 +13,56 @@ import (
 	"github.com/neuro-soup/evochi/server/internal/event"
 	"github.com/neuro-soup/evochi/server/internal/worker"
 	_ "github.com/neuro-soup/evochi/server/internal/worker"
+	v1 "github.com/neuro-soup/evochi/server/pkg/handler/v1"
 	"github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1/evochiv1connect"
-	"github.com/neuro-soup/evochi/server/pkg/service"
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-	}))
-	slog.SetDefault(log)
+	configureLogger(slog.LevelInfo)
+
+	cfg, err := loadConfig()
+	if err != nil {
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
+	}
+
+	configureLogger(cfg.SlogLevel())
 
 	workers := worker.NewPool()
-	go workers.GarbageCollect(workerTimeout)
-
 	events := event.NewQueue()
 
-	handler := service.NewHandler(workers, events)
-
 	mux := http.NewServeMux()
-	mux.Handle(evochiv1connect.NewEvochiServiceHandler(handler))
+	registerV1(mux, workers, events)
 	mux.Handle("/metrics", promhttp.Handler())
 
-	slog.Info("starting server", "port", port)
+	slog.Info("starting server", "port", cfg.ServerPort)
 
-	err := http.ListenAndServe(
-		fmt.Sprintf(":%d", port),
+	err = http.ListenAndServe(
+		fmt.Sprintf(":%d", cfg.ServerPort),
 		h2c.NewHandler(mux, new(http2.Server)),
 	)
 	if err != nil {
-		slog.Error("failed to start server", "error", err, "port", port)
+		slog.Error("failed to start server", "error", err, "port", cfg.ServerPort)
 	}
+}
 
-	slog.Info("server stopped", "port", port)
+func configureLogger(level slog.Level) {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	}))
+	slog.SetDefault(log)
+}
+
+func registerV1(mux *http.ServeMux, workers *worker.Pool, events *event.Queue) {
+	v1 := v1.New(
+		v1.Config{
+			JWTSecret:  "secret",
+			MaxWorkers: 10,
+			MaxEpochs:  10,
+		},
+		workers,
+		events,
+	)
+
+	mux.Handle(evochiv1connect.NewEvochiServiceHandler(v1))
 }

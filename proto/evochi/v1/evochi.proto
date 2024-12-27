@@ -4,16 +4,61 @@ package evochi.v1;
 
 import "google/protobuf/timestamp.proto";
 
+message Slice {
+  // the start index (inclusive)
+  int32 start = 1;
+
+  // the end index (exclusive)
+  int32 end = 2;
+}
+
 enum EventType {
   EVENT_TYPE_UNSPECIFIED = 0;
   EVENT_TYPE_HELLO = 1;
+  EVENT_TYPE_EVALUATE = 3;
+  EVENT_TYPE_OPTIMIZE = 4;
 }
 
+// the server welcomes and initialises the worker
 message HelloEvent {
   // the id assigned to the worker
   string id = 1;
+
+  // total population size
+  int32 population_size = 2;
+
+  // the initial state of the worker, where the encoding value is up to the
+  // workers. if nil, the worker is the first one to join the work force.
+  optional bytes state = 3;
+
+  // custom attributes set by the server
+  map<string, bytes> attrs = 4;
 }
 
+// the server requests the worker to evaluate a slice
+message EvaluateEvent {
+  // the id of the evaluation
+  string eval_id = 1;
+
+  // the slices to be evaluated
+  repeated Slice slices = 2;
+}
+
+// the server requests the worker to optimize its parameters
+message OptimizeEvent {
+  // the current epoch
+  int32 epoch = 1;
+
+  // whether to send the optimized state to the server after the optimization
+  // step
+  bool share_state = 2;
+
+  // the accumulated rewards in the current epoch, where the encoding value
+  // is up to the workers
+  repeated bytes rewards = 3;
+}
+
+// the client asks the server to join the work force
 message SubscribeRequest {
   // number of cores that the worker contributes to the evaluation
   int32 cores = 1;
@@ -29,9 +74,12 @@ message SubscribeResponse {
   // the event data
   oneof event {
     HelloEvent hello = 2;
+    EvaluateEvent evaluate = 3;
+    OptimizeEvent optimize = 4;
   }
 }
 
+// the client sends the server a heartbeat to keep the connection alive
 message HeartbeatRequest {
   // the sequence id of the heartbeat
   int32 seq_id = 1;
@@ -40,8 +88,41 @@ message HeartbeatRequest {
   google.protobuf.Timestamp timestamp = 2;
 }
 
+// the server acknowledges that the heartbeat was received
 message HeartbeatResponse {
   // whether the heartbeat was successful
+  bool ok = 1;
+}
+
+// the client tells the server that the worker has finished the evaluation
+message FinishEvaluationRequest {
+  // the id of the evaluation
+  string eval_id = 1;
+
+  // the rewards for each evaluated slice, where the encoding value is up to
+  // the workers
+  repeated bytes rewards = 2;
+}
+
+// the server acknowledges that the evaluation has finished
+message FinishEvaluationResponse {
+  // whether the evaluation was successfully finished
+  bool ok = 1;
+}
+
+// the client tells the server that the worker has finished the optimization
+message FinishOptimizationRequest {
+  // the optimized state of the worker, where the encoding value is up to the
+  // workers
+  //
+  // only workers with `OptimizeEvent.share_state = true` must send their
+  // optimized state to the server
+  optional bytes state = 1;
+}
+
+// the server acknowledges that the optimization has finished
+message FinishOptimizationResponse {
+  // whether the optimization was successfully finished
   bool ok = 1;
 }
 
@@ -51,4 +132,10 @@ service EvochiService {
 
   // send heartbeat to the server to keep the connection alive
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+
+  // finish the evaluation
+  rpc FinishEvaluation(FinishEvaluationRequest) returns (FinishEvaluationResponse) {}
+
+  // finish the optimization
+  rpc FinishOptimization(FinishOptimizationRequest) returns (FinishOptimizationResponse) {}
 }

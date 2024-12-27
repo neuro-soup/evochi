@@ -3,9 +3,7 @@ package worker
 import (
 	"fmt"
 	"iter"
-	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -67,11 +65,11 @@ func (p *Pool) Add(w *Worker) {
 }
 
 // Remove removes the worker from the pool.
-func (p *Pool) Remove(id uuid.UUID) {
+func (p *Pool) Remove(w *Worker) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	delete(p.pool, id)
+	delete(p.pool, w.ID)
 
 	workersRemoved.Inc()
 }
@@ -87,25 +85,5 @@ func (p *Pool) Iter() iter.Seq[*Worker] {
 				return
 			}
 		}
-	}
-}
-
-// GarbageCollect periodically removes workers that were idle for too long.
-func (p *Pool) GarbageCollect(timeout time.Duration) {
-	for {
-		now := time.Now()
-
-		p.mu.Lock()
-		for _, w := range p.pool {
-			if now.Sub(w.LastSeen) < timeout {
-				continue
-			}
-
-			slog.Debug("removing idle worker", "id", w.ID)
-			delete(p.pool, w.ID)
-		}
-		p.mu.Unlock()
-
-		time.Sleep(timeout)
 	}
 }

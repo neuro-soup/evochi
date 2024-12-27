@@ -43,6 +43,9 @@ const (
 	// EvochiServiceFinishOptimizationProcedure is the fully-qualified name of the EvochiService's
 	// FinishOptimization RPC.
 	EvochiServiceFinishOptimizationProcedure = "/evochi.v1.EvochiService/FinishOptimization"
+	// EvochiServiceFinishInitializationProcedure is the fully-qualified name of the EvochiService's
+	// FinishInitialization RPC.
+	EvochiServiceFinishInitializationProcedure = "/evochi.v1.EvochiService/FinishInitialization"
 )
 
 // EvochiServiceClient is a client for the evochi.v1.EvochiService service.
@@ -55,6 +58,8 @@ type EvochiServiceClient interface {
 	FinishEvaluation(context.Context, *connect_go.Request[v1.FinishEvaluationRequest]) (*connect_go.Response[v1.FinishEvaluationResponse], error)
 	// finish the optimization
 	FinishOptimization(context.Context, *connect_go.Request[v1.FinishOptimizationRequest]) (*connect_go.Response[v1.FinishOptimizationResponse], error)
+	// finish the initialization
+	FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error)
 }
 
 // NewEvochiServiceClient constructs a client for the evochi.v1.EvochiService service. By default,
@@ -87,15 +92,21 @@ func NewEvochiServiceClient(httpClient connect_go.HTTPClient, baseURL string, op
 			baseURL+EvochiServiceFinishOptimizationProcedure,
 			opts...,
 		),
+		finishInitialization: connect_go.NewClient[v1.FinishInitializationRequest, v1.FinishInitializationResponse](
+			httpClient,
+			baseURL+EvochiServiceFinishInitializationProcedure,
+			opts...,
+		),
 	}
 }
 
 // evochiServiceClient implements EvochiServiceClient.
 type evochiServiceClient struct {
-	subscribe          *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
-	heartbeat          *connect_go.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
-	finishEvaluation   *connect_go.Client[v1.FinishEvaluationRequest, v1.FinishEvaluationResponse]
-	finishOptimization *connect_go.Client[v1.FinishOptimizationRequest, v1.FinishOptimizationResponse]
+	subscribe            *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
+	heartbeat            *connect_go.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
+	finishEvaluation     *connect_go.Client[v1.FinishEvaluationRequest, v1.FinishEvaluationResponse]
+	finishOptimization   *connect_go.Client[v1.FinishOptimizationRequest, v1.FinishOptimizationResponse]
+	finishInitialization *connect_go.Client[v1.FinishInitializationRequest, v1.FinishInitializationResponse]
 }
 
 // Subscribe calls evochi.v1.EvochiService.Subscribe.
@@ -118,6 +129,11 @@ func (c *evochiServiceClient) FinishOptimization(ctx context.Context, req *conne
 	return c.finishOptimization.CallUnary(ctx, req)
 }
 
+// FinishInitialization calls evochi.v1.EvochiService.FinishInitialization.
+func (c *evochiServiceClient) FinishInitialization(ctx context.Context, req *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error) {
+	return c.finishInitialization.CallUnary(ctx, req)
+}
+
 // EvochiServiceHandler is an implementation of the evochi.v1.EvochiService service.
 type EvochiServiceHandler interface {
 	// join the work force and subscribe to events
@@ -128,6 +144,8 @@ type EvochiServiceHandler interface {
 	FinishEvaluation(context.Context, *connect_go.Request[v1.FinishEvaluationRequest]) (*connect_go.Response[v1.FinishEvaluationResponse], error)
 	// finish the optimization
 	FinishOptimization(context.Context, *connect_go.Request[v1.FinishOptimizationRequest]) (*connect_go.Response[v1.FinishOptimizationResponse], error)
+	// finish the initialization
+	FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error)
 }
 
 // NewEvochiServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -157,6 +175,11 @@ func NewEvochiServiceHandler(svc EvochiServiceHandler, opts ...connect_go.Handle
 		svc.FinishOptimization,
 		opts...,
 	))
+	mux.Handle(EvochiServiceFinishInitializationProcedure, connect_go.NewUnaryHandler(
+		EvochiServiceFinishInitializationProcedure,
+		svc.FinishInitialization,
+		opts...,
+	))
 	return "/evochi.v1.EvochiService/", mux
 }
 
@@ -177,4 +200,8 @@ func (UnimplementedEvochiServiceHandler) FinishEvaluation(context.Context, *conn
 
 func (UnimplementedEvochiServiceHandler) FinishOptimization(context.Context, *connect_go.Request[v1.FinishOptimizationRequest]) (*connect_go.Response[v1.FinishOptimizationResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("evochi.v1.EvochiService.FinishOptimization is not implemented"))
+}
+
+func (UnimplementedEvochiServiceHandler) FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("evochi.v1.EvochiService.FinishInitialization is not implemented"))
 }

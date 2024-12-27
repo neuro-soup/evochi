@@ -26,19 +26,24 @@ func (h *Handler) Subscribe(
 
 	// add worker to pools
 	h.workers.Add(w)
-	h.conns.add(w)
 
 	// cleanup on exit
 	defer h.workers.Remove(w)
 	defer h.events.Close(w)
-	defer h.conns.remove(w)
+
+	if h.epoch == nil {
+		// first worker, create epoch
+		h.handleFirstSubscriber(w)
+	} else {
+		h.handleSubsequentSubscriber(w)
+	}
 
 	// TODO: assign evals if epoch is not nil
 
 	// event-loop
 	for {
 		select {
-		case <-h.conns.disconnects(w): // server-side cancellation
+		case <-w.Removes(): // server-side cancellation
 			slog.Debug("server cancelled subscription")
 			// TODO: re-distribute work load of cancelled worker
 
@@ -63,6 +68,15 @@ func (h *Handler) Subscribe(
 	}
 }
 
+func (h *Handler) handleFirstSubscriber(w *worker.Worker) {
+	panic("not implemented") // TODO: implement
+}
+
+func (h *Handler) handleSubsequentSubscriber(w *worker.Worker) {
+	// TODO: send current state to the new worker and assign tasks
+	panic("not implemented") // TODO: implement
+}
+
 // eventToProto converts an event to a proto message.
 func eventToProto(evt event.Event) *evochiv1.SubscribeResponse {
 	switch evt := evt.(type) {
@@ -84,7 +98,7 @@ func eventToProto(evt event.Event) *evochiv1.SubscribeResponse {
 			Type: evochiv1.EventType_EVENT_TYPE_EVALUATE,
 			Event: &evochiv1.SubscribeResponse_Evaluate{
 				Evaluate: &evochiv1.EvaluateEvent{
-					EvalId: evt.EvalID.String(),
+					TaskId: evt.TaskID.String(),
 					Slices: slicesToProto(evt.Slices),
 				},
 			},
@@ -95,6 +109,7 @@ func eventToProto(evt event.Event) *evochiv1.SubscribeResponse {
 			Type: evochiv1.EventType_EVENT_TYPE_OPTIMIZE,
 			Event: &evochiv1.SubscribeResponse_Optimize{
 				Optimize: &evochiv1.OptimizeEvent{
+					TaskId:     evt.TaskID.String(),
 					Epoch:      int32(evt.Epoch),
 					Rewards:    evt.Rewards,
 					ShareState: evt.ShareState,

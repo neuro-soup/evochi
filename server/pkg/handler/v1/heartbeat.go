@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	connect "github.com/bufbuild/connect-go"
+	"github.com/neuro-soup/evochi/server/internal/worker/task"
 	evochiv1 "github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1"
 )
 
@@ -18,19 +19,33 @@ func (h *Handler) Heartbeat(
 		"timestamp", req.Msg.Timestamp,
 	)
 
-	worker, _, err := h.authenticateWorker(req.Header())
+	w, _, err := h.authenticateWorker(req.Header())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf(
 			"failed to authenticate worker: %w", err,
 		))
 	}
 
-	err = worker.Heartbeat(uint(req.Msg.SeqId), req.Msg.Timestamp.AsTime())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf(
-			"heartbeat failed: %w", err,
+	hbs := task.Heartbeats(w.Tasks)
+	if len(hbs) == 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
+			"no heartbeat tasks found",
 		))
 	}
+	hb := hbs[0]
+	if hb.SeqID != uint(req.Msg.SeqId) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
+			"heartbeat mismatch: expected %d, got %d",
+			hb.SeqID, req.Msg.SeqId,
+		))
+	}
+
+	// complete the task
+	hb.Done()
+	w.Tasks.Remove(hb)
+
+	// add new heartbeat task
+	w.Tasks.Add(task.NewHeartbeat(hb.SeqID+1, h.cfg.WorkerTimeout))
 
 	return connect.NewResponse(&evochiv1.HeartbeatResponse{Ok: true}), nil
 }

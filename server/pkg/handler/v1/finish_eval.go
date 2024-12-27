@@ -13,7 +13,7 @@ func (h *Handler) FinishEvaluation(
 	req *connect.Request[evochiv1.FinishEvaluationRequest],
 ) (*connect.Response[evochiv1.FinishEvaluationResponse], error) {
 	slog.Debug("handling finish evaluation request",
-		"eval_id", req.Msg.EvalId,
+		"task", req.Msg.TaskId,
 		"rewards", len(req.Msg.Rewards),
 	)
 

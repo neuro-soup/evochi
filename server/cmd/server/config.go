@@ -30,6 +30,12 @@ type config struct {
 	// MaxEpochs is the maximum number of epochs to run. Defaults to 0, which
 	// means there is no limit.
 	MaxEpochs uint `split_words:"true" default:"0"`
+
+	// PopulationSize is the size of the population to use.
+	PopulationSize uint `split_words:"true" require:"100"`
+
+	// Attrs are the custom attributes to use.
+	Attrs map[string]string `split_words:"true"`
 }
 
 func loadConfig() (*config, error) {

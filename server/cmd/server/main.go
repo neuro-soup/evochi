@@ -29,10 +29,12 @@ func main() {
 	configureLogger(cfg.SlogLevel())
 
 	workers := worker.NewPool()
+	go workers.Watch(cfg.WorkerTimeout)
+
 	events := event.NewQueue()
 
 	mux := http.NewServeMux()
-	registerV1(mux, workers, events)
+	registerV1(cfg, mux, workers, events)
 	mux.Handle("/metrics", promhttp.Handler())
 
 	slog.Info("starting server", "port", cfg.ServerPort)
@@ -53,12 +55,25 @@ func configureLogger(level slog.Level) {
 	slog.SetDefault(log)
 }
 
-func registerV1(mux *http.ServeMux, workers *worker.Pool, events *event.Queue) {
+func registerV1(
+	cfg *config,
+	mux *http.ServeMux,
+	workers *worker.Pool,
+	events *event.Queue,
+) {
+	attrs := make(map[string][]byte)
+	for key, val := range cfg.Attrs {
+		attrs[key] = []byte(val)
+	}
+
 	v1 := v1.New(
 		v1.Config{
-			JWTSecret:  "secret",
-			MaxWorkers: 10,
-			MaxEpochs:  10,
+			JWTSecret:      cfg.JWTSecret,
+			MaxWorkers:     cfg.MaxWorkers,
+			WorkerTimeout:  cfg.WorkerTimeout,
+			MaxEpochs:      cfg.MaxEpochs,
+			PopulationSize: cfg.PopulationSize,
+			Attrs:          attrs,
 		},
 		workers,
 		events,

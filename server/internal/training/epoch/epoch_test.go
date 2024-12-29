@@ -3,7 +3,7 @@ package epoch
 import (
 	"testing"
 
-	"github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/internal/training/eval"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +12,7 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 100, nil)
-		w := worker.New(4, nil)
+		w := newWorker(4)
 
 		e.unassigned.Clear()
 
@@ -25,7 +25,7 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 10, nil)
-		w := worker.New(10, nil)
+		w := newWorker(10)
 
 		assigned := e.Assign(w)
 
@@ -40,7 +40,7 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 5, nil)
-		w := worker.New(5, nil)
+		w := newWorker(5)
 
 		assigned := e.Assign(w)
 
@@ -55,7 +55,7 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 10, nil)
-		w := worker.New(5, nil)
+		w := newWorker(5)
 
 		assigned := e.Assign(w)
 
@@ -72,14 +72,14 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 10, nil)
-		w := worker.New(10, nil)
+		w := newWorker(10)
 
 		e.unassigned.Clear()
-		e.unassigned.Push(Slice{
+		e.unassigned.Push(eval.Slice{
 			Start: 0,
 			End:   5,
 		})
-		e.unassigned.Push(Slice{
+		e.unassigned.Push(eval.Slice{
 			Start: 7,
 			End:   10,
 		})
@@ -99,14 +99,14 @@ func TestEpoch_Assign(t *testing.T) {
 		r := require.New(t)
 
 		e := New(1, 7, nil)
-		w := worker.New(5, nil)
+		w := newWorker(5)
 
 		e.unassigned.Clear()
-		e.unassigned.Push(Slice{
+		e.unassigned.Push(eval.Slice{
 			Start: 0,
 			End:   5,
 		})
-		e.unassigned.Push(Slice{
+		e.unassigned.Push(eval.Slice{
 			Start: 7,
 			End:   10,
 		})

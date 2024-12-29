@@ -33,18 +33,6 @@ func NewInitialize(epoch uint, timeout time.Duration) *Initialize {
 	}
 }
 
-func Initializes(pool *Pool) []*Initialize {
-	var inits []*Initialize
-	for _, task := range pool.Tasks() {
-		hb, ok := task.(*Initialize)
-		if !ok {
-			continue
-		}
-		inits = append(inits, hb)
-	}
-	return inits
-}
-
 func (i *Initialize) ID() uuid.UUID {
 	return i.id
 }

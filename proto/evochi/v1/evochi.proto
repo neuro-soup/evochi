@@ -17,6 +17,7 @@ enum EventType {
   EVENT_TYPE_HELLO = 1;
   EVENT_TYPE_EVALUATE = 3;
   EVENT_TYPE_OPTIMIZE = 4;
+  EVENT_TYPE_INITIALIZE = 5;
 }
 
 // the server welcomes and initialises the worker
@@ -24,15 +25,16 @@ message HelloEvent {
   // the id assigned to the worker
   string id = 1;
 
+  // the token assigned to the worker. now, the worker have to send this token
+  // as `Authorization: Bearer <token>` to the server to authenticate itself.
+  string token = 2;
+
   // total population size
-  int32 population_size = 2;
+  int32 population_size = 3;
 
   // the initial state of the worker, where the encoding value is up to the
   // workers. if nil, the worker is the first one to join the work force.
-  optional bytes state = 3;
-
-  // custom attributes set by the server
-  map<string, bytes> attrs = 4;
+  optional bytes state = 4;
 }
 
 // the server requests the worker to evaluate a slice
@@ -61,13 +63,17 @@ message OptimizeEvent {
   repeated bytes rewards = 4;
 }
 
+// the server requests the worker to create the initial state and send it to the
+// server.
+message InitializeEvent {
+  // the id of the initialization
+  string task_id = 1;
+}
+
 // the client asks the server to join the work force
 message SubscribeRequest {
   // number of cores that the worker contributes to the evaluation
   int32 cores = 1;
-
-  // custom attributes set by the worker
-  map<string, bytes> attrs = 2;
 }
 
 message SubscribeResponse {
@@ -79,6 +85,7 @@ message SubscribeResponse {
     HelloEvent hello = 2;
     EvaluateEvent evaluate = 3;
     OptimizeEvent optimize = 4;
+    InitializeEvent initialize = 5;
   }
 }
 

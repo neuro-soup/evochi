@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/neuro-soup/evochi/server/internal/worker/task"
+	"github.com/neuro-soup/evochi/server/internal/distribution/task"
 )
 
 var ErrHeartbeatMismatch = errors.New("worker: heartbeat mismatch")
@@ -17,33 +17,45 @@ type Worker struct {
 	// Cores is the number of cores the worker contributes to the server.
 	Cores uint
 
-	// Attrs are custom attributes assigned by the worker.
-	Attrs map[string][]byte
-
 	// JoinedAt is the time the worker joined.
 	JoinedAt time.Time
 
 	// Tasks is the pool of tasks assigned to the worker.
 	Tasks *task.Pool
 
+	// removeCh is a channel that is closed when the worker is removed.
 	removeCh chan struct{}
+	removed  bool
 }
 
 // New creates a new worker.
-func New(cores uint, attrs map[string][]byte) *Worker {
+func New(cores uint) *Worker {
 	return &Worker{
 		ID:       uuid.New(),
 		Cores:    cores,
-		Attrs:    attrs,
 		JoinedAt: time.Now(),
 		Tasks:    task.NewPool(),
-		removeCh: make(chan struct{}),
+		removeCh: make(chan struct{}, 1),
 	}
 }
 
+// WorkerID returns the unique ID of the worker.
+func (w *Worker) WorkerID() uuid.UUID {
+	return w.ID
+}
+
+// WorkerCores returns the number of cores the worker contributes to the server.
+func (w *Worker) WorkerCores() uint {
+	return w.Cores
+}
+
 func (w *Worker) Remove() {
+	if w.removed {
+		return
+	}
 	w.removeCh <- struct{}{}
 	close(w.removeCh) // TODO: validate this
+	w.removed = true
 }
 
 func (w *Worker) Removes() <-chan struct{} {

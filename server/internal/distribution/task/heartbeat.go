@@ -33,18 +33,6 @@ func NewHeartbeat(seqID uint, timeout time.Duration) *Heartbeat {
 	}
 }
 
-func Heartbeats(pool *Pool) []*Heartbeat {
-	var heartbeats []*Heartbeat
-	for _, task := range pool.Tasks() {
-		hb, ok := task.(*Heartbeat)
-		if !ok {
-			continue
-		}
-		heartbeats = append(heartbeats, hb)
-	}
-	return heartbeats
-}
-
 func (h *Heartbeat) ID() uuid.UUID {
 	return h.id
 }

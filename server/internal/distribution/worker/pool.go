@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -81,6 +82,18 @@ func (p *Pool) remove(w *Worker) {
 	w.Remove()
 }
 
+func (p *Pool) Workers() []*Worker {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	var workers []*Worker
+	for _, w := range p.pool {
+		workers = append(workers, w)
+	}
+
+	return workers
+}
+
 // Watch watches the pool for unproductive workers and removes them.
 func (p *Pool) Watch(sleep time.Duration) {
 	for {
@@ -97,4 +110,28 @@ func (p *Pool) Watch(sleep time.Duration) {
 
 		time.Sleep(sleep)
 	}
+}
+
+// Trusted returns a random trustworthy worker that passes the filter.
+func (p *Pool) Trusted(filter func(w *Worker) bool) *Worker {
+	var pool []*Worker
+	if filter != nil {
+		for _, w := range p.pool {
+			if filter(w) {
+				pool = append(pool, w)
+			}
+		}
+	} else {
+		pool = make([]*Worker, 0, len(p.pool))
+		for _, w := range p.pool {
+			pool = append(pool, w)
+		}
+	}
+
+	// no workers left
+	if len(pool) == 0 {
+		return nil
+	}
+
+	return pool[rand.Intn(len(pool))]
 }

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	connect "github.com/bufbuild/connect-go"
-	"github.com/neuro-soup/evochi/server/internal/epoch"
-	"github.com/neuro-soup/evochi/server/internal/event"
-	"github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/internal/distribution/task"
+	"github.com/neuro-soup/evochi/server/internal/distribution/worker"
+	"github.com/neuro-soup/evochi/server/internal/training/epoch"
+	"github.com/neuro-soup/evochi/server/internal/training/eval"
 	evochiv1 "github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1"
 )
 
@@ -19,110 +21,182 @@ func (h *Handler) Subscribe(
 ) error {
 	slog.Debug("handling subscribe request",
 		"cores", req.Msg.Cores,
-		"attrs", req.Msg.Attrs,
 	)
 
-	w := worker.New(uint(req.Msg.Cores), req.Msg.Attrs)
+	// create worker
+	w := worker.New(uint(req.Msg.Cores))
 
-	// add worker to pools
+	// add worker to pools and cleanup on exit
 	h.workers.Add(w)
-
-	// cleanup on exit
 	defer h.workers.Remove(w)
-	defer h.events.Close(w)
+
+	// demand heartbeat
+	w.Tasks.Add(task.NewHeartbeat(1, h.cfg.WorkerTimeout))
 
 	if h.epoch == nil {
-		// first worker, create epoch
-		h.handleFirstSubscriber(w)
+		// first worker, create and initialise epoch, send hello event
+		h.handleFirstSubscriber(stream, w)
 	} else {
-		h.handleSubsequentSubscriber(w)
+		// subsequent worker, send hello event
+		h.handleSubsequentSubscriber(stream, w)
 	}
-
-	// TODO: assign evals if epoch is not nil
 
 	// event-loop
 	for {
 		select {
 		case <-w.Removes(): // server-side cancellation
 			slog.Debug("server cancelled subscription")
-			// TODO: re-distribute work load of cancelled worker
 
+			h.handleCancellation(w)
 			return nil
 
 		case <-ctx.Done(): // client-side cancellation
 			slog.Debug("client cancelled subscription")
-			// TODO: re-distribute work load of cancelled worker
 
+			h.handleCancellation(w)
 			return ctx.Err()
 
-		case evt := <-h.events.Pull(w):
-			slog.Debug("sending event to worker", "event", evt, "worker", w.ID)
+		case t := <-w.Tasks.Notify():
+			resp := taskToProto(t)
+			if resp == nil {
+				// ignore tasks that are not of interest
+				continue
+			}
 
-			if err := stream.Send(eventToProto(evt)); err != nil {
-				slog.Error("failed to send event to worker", "error", err)
+			slog.Debug("sending task to worker", "event", t, "worker", w.ID)
 
-				// TODO: re-distribute work load of cancelled worker
+			if err := stream.Send(resp); err != nil {
+				slog.Error("failed to send task to worker", "error", err)
+
+				h.handleCancellation(w)
 				return err
 			}
 		}
 	}
 }
 
-func (h *Handler) handleFirstSubscriber(w *worker.Worker) {
-	panic("not implemented") // TODO: implement
+func (h *Handler) handleFirstSubscriber(
+	stream *connect.ServerStream[evochiv1.SubscribeResponse],
+	w *worker.Worker,
+) {
+	slog.Debug("handling first subscriber", "worker", w.ID)
+
+	h.epoch = epoch.New(1, h.cfg.PopulationSize, nil)
+	t := task.NewInitialize(h.epoch.Number, h.cfg.WorkerTimeout)
+
+	// initialise worker by sending hello event and demand initial state
+	err := stream.Send(&evochiv1.SubscribeResponse{
+		Event: &evochiv1.SubscribeResponse_Hello{
+			Hello: &evochiv1.HelloEvent{
+				Id:             w.ID.String(),
+				PopulationSize: int32(h.cfg.PopulationSize),
+				State:          nil, // is initialised and set by the client
+			},
+		},
+	})
+	if err != nil {
+		slog.Error("failed to send hello event", "error", err)
+		w.Remove()
+		return
+	}
+
+	w.Tasks.Add(t)
 }
 
-func (h *Handler) handleSubsequentSubscriber(w *worker.Worker) {
-	// TODO: send current state to the new worker and assign tasks
-	panic("not implemented") // TODO: implement
+func (h *Handler) handleSubsequentSubscriber(
+	stream *connect.ServerStream[evochiv1.SubscribeResponse],
+	w *worker.Worker,
+) {
+	slog.Debug("handling subsequent subscriber", "worker", w.ID)
+
+	// initialise worker by sending hello event
+	err := stream.Send(&evochiv1.SubscribeResponse{
+		Event: &evochiv1.SubscribeResponse_Hello{
+			Hello: &evochiv1.HelloEvent{
+				Id:             w.ID.String(),
+				PopulationSize: int32(h.epoch.Population),
+				State:          h.epoch.State,
+			},
+		},
+	})
+	if err != nil {
+		slog.Error("failed to send hello event", "error", err)
+		w.Remove()
+		return
+	}
+
+	if h.epoch == nil || h.epoch.State == nil {
+		// epoch is not initialised yet
+		return
+	}
+
+	// try to assign slices to the worker
+	assigned := h.epoch.Assign(w)
+	if len(assigned) == 0 {
+		// no tasks to assign, worker is idle
+		return
+	}
+
+	// add task to worker, which will be picked up by the event-loop
+	t := task.NewEvaluate(h.epoch.Number, assigned, h.cfg.WorkerTimeout)
+	w.Tasks.Add(t)
 }
 
-// eventToProto converts an event to a proto message.
-func eventToProto(evt event.Event) *evochiv1.SubscribeResponse {
-	switch evt := evt.(type) {
-	case event.Hello:
+func (h *Handler) handleCancellation(w *worker.Worker) {
+	suc := h.workers.Trusted(func(f *worker.Worker) bool { return f.ID != w.ID })
+	if suc == nil {
+		// no successor worker available
+		h.epoch = nil
+		return
+	}
+
+	// re-distribute work load of cancelled worker
+	for _, t := range w.Tasks.Tasks() {
+		switch t := t.(type) {
+		case *task.Initialize:
+			t.RequestedAt = time.Now()
+			suc.Tasks.Add(t)
+		case *task.Evaluate:
+			t.RequestedAt = time.Now()
+			suc.Tasks.Add(t)
+		}
+	}
+
+	// remove worker from pool
+	w.Remove()
+}
+
+func taskToProto(t task.Task) *evochiv1.SubscribeResponse {
+	switch t := t.(type) {
+	case *task.Initialize:
 		return &evochiv1.SubscribeResponse{
-			Type: evochiv1.EventType_EVENT_TYPE_HELLO,
-			Event: &evochiv1.SubscribeResponse_Hello{
-				Hello: &evochiv1.HelloEvent{
-					Id:             evt.ID.String(),
-					PopulationSize: int32(evt.PopulationSize),
-					State:          evt.State,
-					Attrs:          evt.Attrs,
+			Event: &evochiv1.SubscribeResponse_Initialize{
+				Initialize: &evochiv1.InitializeEvent{
+					TaskId: t.ID().String(),
 				},
 			},
 		}
 
-	case event.Evaluate:
+	case *task.Evaluate:
 		return &evochiv1.SubscribeResponse{
-			Type: evochiv1.EventType_EVENT_TYPE_EVALUATE,
 			Event: &evochiv1.SubscribeResponse_Evaluate{
 				Evaluate: &evochiv1.EvaluateEvent{
-					TaskId: evt.TaskID.String(),
-					Slices: slicesToProto(evt.Slices),
+					TaskId: t.ID().String(),
+					Slices: slicesToProto(t.Slices),
 				},
 			},
 		}
 
-	case event.Optimize:
-		return &evochiv1.SubscribeResponse{
-			Type: evochiv1.EventType_EVENT_TYPE_OPTIMIZE,
-			Event: &evochiv1.SubscribeResponse_Optimize{
-				Optimize: &evochiv1.OptimizeEvent{
-					TaskId:     evt.TaskID.String(),
-					Epoch:      int32(evt.Epoch),
-					Rewards:    evt.Rewards,
-					ShareState: evt.ShareState,
-				},
-			},
-		}
+	case *task.Heartbeat:
+		// ignore heartbeats
+		return nil
 
 	default:
-		panic(fmt.Errorf("unknown event type: %T", evt))
+		panic(fmt.Sprintf("unknown task type: %T", t))
 	}
 }
 
-func slicesToProto(slices []epoch.Slice) []*evochiv1.Slice {
+func slicesToProto(slices []eval.Slice) []*evochiv1.Slice {
 	out := make([]*evochiv1.Slice, len(slices))
 	for i, slice := range slices {
 		out[i] = &evochiv1.Slice{

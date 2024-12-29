@@ -3,9 +3,8 @@ package v1
 import (
 	"time"
 
-	"github.com/neuro-soup/evochi/server/internal/epoch"
-	"github.com/neuro-soup/evochi/server/internal/event"
-	"github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/internal/distribution/worker"
+	"github.com/neuro-soup/evochi/server/internal/training/epoch"
 	"github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1/evochiv1connect"
 )
 
@@ -35,7 +34,6 @@ type Handler struct {
 	cfg Config
 
 	workers *worker.Pool
-	events  *event.Queue
 
 	// epoch is the current epoch.
 	epoch *epoch.Epoch
@@ -44,10 +42,9 @@ type Handler struct {
 var _ evochiv1connect.EvochiServiceHandler = (*Handler)(nil)
 
 // New creates a new handler.
-func New(config Config, workers *worker.Pool, events *event.Queue) *Handler {
+func New(config Config, workers *worker.Pool) *Handler {
 	return &Handler{
 		cfg:     config,
 		workers: workers,
-		events:  events,
 	}
 }

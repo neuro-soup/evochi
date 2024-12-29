@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	connect "github.com/bufbuild/connect-go"
-	"github.com/neuro-soup/evochi/server/internal/worker/task"
+	"github.com/neuro-soup/evochi/server/internal/distribution/task"
 	evochiv1 "github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1"
 )
 
@@ -19,6 +19,7 @@ func (h *Handler) Heartbeat(
 		"timestamp", req.Msg.Timestamp,
 	)
 
+	// authenticate worker
 	w, _, err := h.authenticateWorker(req.Header())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf(
@@ -26,12 +27,14 @@ func (h *Handler) Heartbeat(
 		))
 	}
 
-	hbs := task.Heartbeats(w.Tasks)
+	// check if there is a heartbeat task
+	hbs := task.Collect[*task.Heartbeat](w.Tasks)
 	if len(hbs) == 0 {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
 			"no heartbeat tasks found",
 		))
 	}
+
 	hb := hbs[0]
 	if hb.SeqID != uint(req.Msg.SeqId) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(

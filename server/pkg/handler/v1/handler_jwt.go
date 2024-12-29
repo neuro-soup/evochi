@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/internal/distribution/worker"
 )
 
 type Claims struct {

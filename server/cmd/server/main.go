@@ -10,9 +10,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/neuro-soup/evochi/server/internal/event"
-	"github.com/neuro-soup/evochi/server/internal/worker"
-	_ "github.com/neuro-soup/evochi/server/internal/worker"
+	"github.com/neuro-soup/evochi/server/internal/distribution/worker"
 	v1 "github.com/neuro-soup/evochi/server/pkg/handler/v1"
 	"github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1/evochiv1connect"
 )
@@ -31,10 +29,8 @@ func main() {
 	workers := worker.NewPool()
 	go workers.Watch(cfg.WorkerTimeout)
 
-	events := event.NewQueue()
-
 	mux := http.NewServeMux()
-	registerV1(cfg, mux, workers, events)
+	registerV1(cfg, mux, workers)
 	mux.Handle("/metrics", promhttp.Handler())
 
 	slog.Info("starting server", "port", cfg.ServerPort)
@@ -55,12 +51,9 @@ func configureLogger(level slog.Level) {
 	slog.SetDefault(log)
 }
 
-func registerV1(
-	cfg *config,
-	mux *http.ServeMux,
-	workers *worker.Pool,
-	events *event.Queue,
-) {
+func registerV1(cfg *config, mux *http.ServeMux, workers *worker.Pool) {
+	slog.Debug("registering v1 handler")
+
 	attrs := make(map[string][]byte)
 	for key, val := range cfg.Attrs {
 		attrs[key] = []byte(val)
@@ -76,7 +69,6 @@ func registerV1(
 			Attrs:          attrs,
 		},
 		workers,
-		events,
 	)
 
 	mux.Handle(evochiv1connect.NewEvochiServiceHandler(v1))

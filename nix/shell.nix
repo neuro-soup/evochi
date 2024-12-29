@@ -20,6 +20,9 @@ pkgs.mkShell {
 
     # python
     uv
+    ruff
     python312
+    python312Packages.grpcio
+    python312Packages.grpcio-tools
   ];
 }

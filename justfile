@@ -11,3 +11,5 @@ proto-gen-python:
            --python_out=clients/python \
            ./proto/evochi/v1/evochi.proto
     ruff format ./clients/python/evochi/v1/evochi_pb2*
+
+proto-gen: proto-gen-server proto-gen-python

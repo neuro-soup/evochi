@@ -239,6 +239,16 @@ func taskToProto(t task.Task) *evochiv1.SubscribeResponse {
 			},
 		}
 
+	case *task.Stop:
+		return &evochiv1.SubscribeResponse{
+			Type: evochiv1.EventType_EVENT_TYPE_STOP,
+			Event: &evochiv1.SubscribeResponse_Stop{
+				Stop: &evochiv1.StopEvent{
+					TaskId: t.ID().String(),
+				},
+			},
+		}
+
 	case *task.Heartbeat:
 		// ignore heartbeats
 		return nil

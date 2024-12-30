@@ -27,6 +27,7 @@ enum EventType {
   EVENT_TYPE_OPTIMIZE = 4;
   EVENT_TYPE_INITIALIZE = 5;
   EVENT_TYPE_SHARE_STATE = 6;
+  EVENT_TYPE_STOP = 7;
 }
 
 // the server welcomes and initialises the worker
@@ -90,6 +91,12 @@ message ShareStateEvent {
   int32 epoch = 2;
 }
 
+// the server requests the worker to stop
+message StopEvent {
+  // the id of the stop
+  string task_id = 1;
+}
+
 // the client asks the server to join the work force
 message SubscribeRequest {
   // number of cores that the worker contributes to the evaluation
@@ -107,6 +114,7 @@ message SubscribeResponse {
     OptimizeEvent optimize = 4;
     InitializeEvent initialize = 5;
     ShareStateEvent share_state = 6;
+    StopEvent stop = 7;
   }
 }
 

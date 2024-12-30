@@ -121,7 +121,10 @@ func (h *Handler) nextEpoch(state eval.State) {
 
 	if h.cfg.MaxEpochs > 0 && h.epoch.Number+1 > h.cfg.MaxEpochs {
 		slog.Info("reached maximum number of epochs", "max", h.cfg.MaxEpochs, "current", h.epoch.Number+1)
-		// TODO:: maybe send a message to all workers to stop
+		for _, w := range h.workers.Workers() {
+			w.Tasks.Add(task.NewStop())
+			w.Remove()
+		}
 		return
 	}
 

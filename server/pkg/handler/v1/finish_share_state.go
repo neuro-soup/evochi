@@ -11,15 +11,15 @@ import (
 	evochiv1 "github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1"
 )
 
-func (h *Handler) FinishOptimization(
+func (h *Handler) FinishShareState(
 	_ context.Context,
-	req *connect.Request[evochiv1.FinishOptimizationRequest],
-) (*connect.Response[evochiv1.FinishOptimizationResponse], error) {
-	slog.Debug("handling finish optimization request",
+	req *connect.Request[evochiv1.FinishShareStateRequest],
+) (*connect.Response[evochiv1.FinishShareStateResponse], error) {
+	slog.Debug("handling finish share state request",
 		"task", req.Msg.TaskId,
+		"state", len(req.Msg.State),
 	)
 
-	// authenticate worker
 	w, _, err := h.authenticateWorker(req.Header())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf(
@@ -27,25 +27,17 @@ func (h *Handler) FinishOptimization(
 		))
 	}
 
-	// check if epoch is initialised
-	if h.epoch == nil || h.epoch.State == nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
-			"epoch is not initialised",
-		))
-	}
-
-	// parse task id
 	taskID, err := uuid.Parse(req.Msg.TaskId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(
-			"invalid task id: %w", err,
+			"invalid task id %w", err,
 		))
 	}
 
-	t := task.Get[*task.Optimize](w.Tasks, taskID)
+	t := task.Get[*task.ShareState](w.Tasks, taskID)
 	if t == nil {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf(
-			"task %s not found", taskID,
+			"task %s not found", req.Msg.TaskId,
 		))
 	}
 
@@ -53,11 +45,12 @@ func (h *Handler) FinishOptimization(
 	t.Done()
 	w.Tasks.Remove(t)
 
-	if h.finished() {
-		// all workers have finished their optimization
-		// request optimized state from trusted workers
-		h.requestState()
+	if t.Epoch == h.epoch.Number && h.finished() {
+		// all workers have finished their state sharing
+		// go to next epoch
+		h.nextEpoch(req.Msg.State)
 	}
 
-	return connect.NewResponse(&evochiv1.FinishOptimizationResponse{Ok: true}), nil
+	msg := &evochiv1.FinishShareStateResponse{Ok: true}
+	return &connect.Response[evochiv1.FinishShareStateResponse]{Msg: msg}, nil
 }

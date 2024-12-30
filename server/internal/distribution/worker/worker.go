@@ -58,6 +58,6 @@ func (w *Worker) Remove() {
 	w.removed = true
 }
 
-func (w *Worker) Removes() <-chan struct{} {
+func (w *Worker) NotifyRemoval() <-chan struct{} {
 	return w.removeCh
 }

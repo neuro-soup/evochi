@@ -8,7 +8,6 @@ import (
 	connect "github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
 	"github.com/neuro-soup/evochi/server/internal/distribution/task"
-	"github.com/neuro-soup/evochi/server/internal/training/eval"
 	evochiv1 "github.com/neuro-soup/evochi/server/pkg/proto/evochi/v1"
 )
 
@@ -18,7 +17,7 @@ func (h *Handler) FinishEvaluation(
 ) (*connect.Response[evochiv1.FinishEvaluationResponse], error) {
 	slog.Debug("handling finish evaluation request",
 		"task", req.Msg.TaskId,
-		"rewards", len(req.Msg.Rewards),
+		"evals", len(req.Msg.Evaluations),
 	)
 
 	w, _, err := h.authenticateWorker(req.Header())
@@ -47,7 +46,7 @@ func (h *Handler) FinishEvaluation(
 	taskID, err := uuid.Parse(req.Msg.TaskId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(
-			"invalid task id: %w", err,
+			"invalid task id %w", err,
 		))
 	}
 
@@ -59,13 +58,20 @@ func (h *Handler) FinishEvaluation(
 		))
 	}
 
+	// complete task
+	t.Done()
+	w.Tasks.Remove(t)
+
 	// apply rewards
-	err = h.epoch.Reward(w, t.Slices, eval.BytesToRewards(req.Msg.Rewards))
+	err = h.epoch.Reward(w, protoToEvals(req.Msg.Evaluations))
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf(
-			"failed to reward: %w", err,
+			"failed to apply rewards: %w", err,
 		))
 	}
+
+	// give next eval task
+	h.eval(w)
 
 	resp := &evochiv1.FinishEvaluationResponse{Ok: true}
 	return &connect.Response[evochiv1.FinishEvaluationResponse]{Msg: resp}, nil

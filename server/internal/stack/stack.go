@@ -34,6 +34,10 @@ func (s *Stack[T]) Push(v T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.push(v)
+}
+
+func (s *Stack[T]) push(v T) {
 	if s.top == len(s.s) {
 		s.s = append(s.s, v)
 	} else {
@@ -41,6 +45,15 @@ func (s *Stack[T]) Push(v T) {
 	}
 
 	s.top++
+}
+
+func (s *Stack[T]) PushAll(values ...T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, v := range values {
+		s.push(v)
+	}
 }
 
 func (s *Stack[T]) Pop() T {

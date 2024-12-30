@@ -20,8 +20,8 @@ func (c *Claims) Admin() bool {
 	return c.Subject == "admin"
 }
 
-// jwtKey returns the key used to verify the JWT token.
-func (h *Handler) jwtKey(t *jwt.Token) (any, error) {
+// jwtPrivKey returns the key used to verify the JWT token.
+func (h *Handler) jwtKey(*jwt.Token) (any, error) {
 	return []byte(h.cfg.JWTSecret), nil
 }
 
@@ -32,6 +32,8 @@ func (h *Handler) authenticate(header http.Header) (*Claims, error) {
 	if tok == "" {
 		return nil, errors.New("auth: token is empty")
 	}
+
+	fmt.Printf("ToKENE: %q\n", tok)
 
 	token, err := jwt.ParseWithClaims(tok, &Claims{}, h.jwtKey)
 	if err != nil {
@@ -80,5 +82,19 @@ func (h *Handler) createJWT(w *worker.Worker) (*jwt.Token, error) {
 			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodPS512.SigningMethodRSA, claims), nil // TODO: make method configurable
+	return jwt.NewWithClaims(jwt.SigningMethodHS512, claims), nil
+}
+
+func (h *Handler) createJWTString(w *worker.Worker) (string, error) {
+	token, err := h.createJWT(w)
+	if err != nil {
+		return "", err
+	}
+
+	key, err := h.jwtKey(token)
+	if err != nil {
+		return "", err
+	}
+
+	return token.SignedString(key)
 }

@@ -25,5 +25,9 @@ pkgs.mkShell {
     python312Packages.grpcio
     python312Packages.grpcio-tools
     python312Packages.zstandard
+    python312Packages.torch
+    python312Packages.gymnasium
+    python312Packages.jaxtyping
+    python312Packages.numpy
   ];
 }

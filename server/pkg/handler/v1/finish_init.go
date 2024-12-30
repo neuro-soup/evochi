@@ -29,15 +29,8 @@ func (h *Handler) FinishInitialization(
 		))
 	}
 
-	// check if epoch has been created
-	if h.epoch != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
-			"epoch %d has already been created", h.epoch.Number,
-		))
-	}
-
 	// check if epoch has been initialized
-	if h.epoch.State != nil {
+	if h.epoch != nil && h.epoch.State != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
 			"epoch %d has already been initialized",
 			h.epoch.Number,
@@ -60,6 +53,10 @@ func (h *Handler) FinishInitialization(
 		))
 	}
 
+	// complete task
+	t.Done()
+	w.Tasks.Remove(t)
+
 	// check if task is related to the current epoch
 	if t.Epoch != h.epoch.Number {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
@@ -72,16 +69,7 @@ func (h *Handler) FinishInitialization(
 
 	// start evaluation
 	for _, a := range h.workers.Workers() {
-		// try to assign slices to the worker
-		slices := h.epoch.Assign(a)
-		if len(slices) == 0 {
-			// no slices assigned
-			continue
-		}
-
-		// add task to worker
-		t := task.NewEvaluate(h.epoch.Number, slices, h.cfg.WorkerTimeout)
-		w.Tasks.Add(t)
+		h.eval(a)
 	}
 
 	return connect.NewResponse(&evochiv1.FinishInitializationResponse{Ok: true}), nil

@@ -32,7 +32,7 @@ type config struct {
 	MaxEpochs uint `split_words:"true" default:"0"`
 
 	// PopulationSize is the size of the population to use.
-	PopulationSize uint `split_words:"true" require:"true"`
+	PopulationSize uint `split_words:"true" required:"true"`
 
 	// Attrs are the custom attributes to use.
 	Attrs map[string]string `split_words:"true"`

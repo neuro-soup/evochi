@@ -28,7 +28,7 @@ func Get[T Task](tasks *Pool, id uuid.UUID) T {
 	tasks.mu.Lock()
 	defer tasks.mu.Unlock()
 
-	t, ok := tasks.Get(id).(T)
+	t, ok := tasks.t[id].(T)
 	if !ok {
 		var zero T
 		return zero
@@ -43,9 +43,26 @@ func Collect[T Task](tasks *Pool) []T {
 
 	ts := make([]T, 0, len(tasks.t))
 	for _, t := range tasks.t {
-		ts = append(ts, t.(T))
+		tt, ok := t.(T)
+		if !ok {
+			continue
+		}
+		ts = append(ts, tt)
 	}
 	return ts
+}
+
+func Contains[T Task](tasks *Pool) bool {
+	tasks.mu.Lock()
+	defer tasks.mu.Unlock()
+
+	for _, t := range tasks.t {
+		_, is := t.(T)
+		if is {
+			return true
+		}
+	}
+	return false
 }
 
 // Get returns a task from the pool.
@@ -68,7 +85,7 @@ func (p *Pool) Add(t Task) {
 }
 
 // Adds returns a channel that receives tasks that are added to the pool.
-func (p *Pool) Notify() <-chan Task {
+func (p *Pool) NotifyAdd() <-chan Task {
 	return p.adds
 }
 
@@ -104,7 +121,23 @@ func (p *Pool) Punctual() bool {
 
 	now := time.Now()
 	for _, t := range p.t {
-		if t.Deadline().After(now) {
+		if t.Deadline().Before(now) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p *Pool) Idle() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, t := range p.t {
+		if t.Deadline().Before(time.Now()) {
+			return false
+		}
+		switch t.(type) {
+		case *Evaluate, *Initialize, *Optimize, *ShareState:
 			return false
 		}
 	}

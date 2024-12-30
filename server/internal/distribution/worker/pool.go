@@ -115,15 +115,8 @@ func (p *Pool) Watch(sleep time.Duration) {
 // Trusted returns a random trustworthy worker that passes the filter.
 func (p *Pool) Trusted(filter func(w *Worker) bool) *Worker {
 	var pool []*Worker
-	if filter != nil {
-		for _, w := range p.pool {
-			if filter(w) {
-				pool = append(pool, w)
-			}
-		}
-	} else {
-		pool = make([]*Worker, 0, len(p.pool))
-		for _, w := range p.pool {
+	for _, w := range p.pool {
+		if (filter == nil || filter(w)) && w.Tasks.Punctual() {
 			pool = append(pool, w)
 		}
 	}
@@ -134,4 +127,15 @@ func (p *Pool) Trusted(filter func(w *Worker) bool) *Worker {
 	}
 
 	return pool[rand.Intn(len(pool))]
+}
+
+func (p *Pool) Idling() []*Worker {
+	var idling []*Worker
+	for _, w := range p.pool {
+		if !w.Tasks.Idle() {
+			continue
+		}
+		idling = append(idling, w)
+	}
+	return idling
 }

@@ -4,6 +4,7 @@ import logging
 import asyncio
 import pickle
 
+from grpc import StatusCode
 import grpc.aio as grpc
 import zstandard as zstd
 
@@ -19,6 +20,7 @@ class Eval(NamedTuple):
 type EvalFn[S] = Callable[[Worker[S], int, list[slice]], list[Eval]]
 type InitFn[S] = Callable[[Worker[S]], Any]
 type OptimizeFn[S] = Callable[[Worker[S], int, list[float]], Any]
+type StopFn[S] = Callable[[Worker[S]], bool]
 
 
 class Worker[S]:
@@ -29,6 +31,7 @@ class Worker[S]:
         evaluate: EvalFn[S],
         initialize: InitFn[S],
         optimize: OptimizeFn[S],
+        stop: StopFn[S] | None = None,
     ) -> None:
         """Initializes the client to interact with the server via the given channel.
 
@@ -38,12 +41,14 @@ class Worker[S]:
             evaluate: A function that evaluates slices of the population upon request.
             initialize: A function that initializes the state upon request.
             optimize: A function that makes optimization steps upon request.
+            stop: A function that is called when the worker should stop.
         """
         self._channel = channel
         self._cores = cores
         self._evaluate = evaluate
         self._initialize = initialize
         self._optimize = optimize
+        self._stop = stop
         self._stub = client.EvochiServiceStub(channel)
         self._heartbeat_seq_id = 0
         self._closed = False
@@ -95,20 +100,28 @@ class Worker[S]:
     async def _handle_events(self) -> None:
         """Handles events from the server."""
         iter = self._subscribe(v1.SubscribeRequest(cores=self._cores))
-        async for event in iter:
-            match event.type:
-                case v1.EVENT_TYPE_HELLO:
-                    self._handle_hello_event(event.hello)
-                case v1.EVENT_TYPE_INITIALIZE:
-                    await self._handle_init_event(event.initialize)
-                case v1.EVENT_TYPE_EVALUATE:
-                    await self._handle_eval_event(event.evaluate)
-                case v1.EVENT_TYPE_SHARE_STATE:
-                    await self._handle_share_state_event(event.share_state)
-                case v1.EVENT_TYPE_OPTIMIZE:
-                    await self._handle_optimize_event(event.optimize)
-                case _:
-                    logging.warning("Received unknown event type %s", event.type)
+        try:
+            async for event in iter:
+                match event.type:
+                    case v1.EVENT_TYPE_HELLO:
+                        self._handle_hello_event(event.hello)
+                    case v1.EVENT_TYPE_INITIALIZE:
+                        await self._handle_init_event(event.initialize)
+                    case v1.EVENT_TYPE_EVALUATE:
+                        await self._handle_eval_event(event.evaluate)
+                    case v1.EVENT_TYPE_SHARE_STATE:
+                        await self._handle_share_state_event(event.share_state)
+                    case v1.EVENT_TYPE_OPTIMIZE:
+                        await self._handle_optimize_event(event.optimize)
+                    case v1.EVENT_TYPE_STOP:
+                        await self._handle_stop_event(event.stop)
+                    case _:
+                        logging.warning("Received unknown event type %s", event.type)
+        except grpc.AioRpcError as e:
+            if e.code() == StatusCode.CANCELLED:
+                logging.debug("Worker cancelled")
+            else:
+                raise e
 
     def _handle_hello_event(self, event: v1.HelloEvent) -> None:
         """Handles a hello event from the server."""
@@ -172,6 +185,12 @@ class Worker[S]:
                 state=self._compressed_state(),
             )
         )
+
+    async def _handle_stop_event(self, event: v1.StopEvent) -> None:
+        """Handles a stop event from the server."""
+        logging.debug("Received stop event with task id %s", event.task_id)
+        if self._stop is not None:
+            self._stop(self)
 
     def _subscribe(
         self,

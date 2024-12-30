@@ -21,6 +21,7 @@ class EventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_TYPE_OPTIMIZE: _ClassVar[EventType]
     EVENT_TYPE_INITIALIZE: _ClassVar[EventType]
     EVENT_TYPE_SHARE_STATE: _ClassVar[EventType]
+    EVENT_TYPE_STOP: _ClassVar[EventType]
 
 EVENT_TYPE_UNSPECIFIED: EventType
 EVENT_TYPE_HELLO: EventType
@@ -28,6 +29,7 @@ EVENT_TYPE_EVALUATE: EventType
 EVENT_TYPE_OPTIMIZE: EventType
 EVENT_TYPE_INITIALIZE: EventType
 EVENT_TYPE_SHARE_STATE: EventType
+EVENT_TYPE_STOP: EventType
 
 class Slice(_message.Message):
     __slots__ = ("start", "end")
@@ -118,6 +120,12 @@ class ShareStateEvent(_message.Message):
         self, task_id: _Optional[str] = ..., epoch: _Optional[int] = ...
     ) -> None: ...
 
+class StopEvent(_message.Message):
+    __slots__ = ("task_id",)
+    TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    task_id: str
+    def __init__(self, task_id: _Optional[str] = ...) -> None: ...
+
 class SubscribeRequest(_message.Message):
     __slots__ = ("cores",)
     CORES_FIELD_NUMBER: _ClassVar[int]
@@ -125,19 +133,29 @@ class SubscribeRequest(_message.Message):
     def __init__(self, cores: _Optional[int] = ...) -> None: ...
 
 class SubscribeResponse(_message.Message):
-    __slots__ = ("type", "hello", "evaluate", "optimize", "initialize", "share_state")
+    __slots__ = (
+        "type",
+        "hello",
+        "evaluate",
+        "optimize",
+        "initialize",
+        "share_state",
+        "stop",
+    )
     TYPE_FIELD_NUMBER: _ClassVar[int]
     HELLO_FIELD_NUMBER: _ClassVar[int]
     EVALUATE_FIELD_NUMBER: _ClassVar[int]
     OPTIMIZE_FIELD_NUMBER: _ClassVar[int]
     INITIALIZE_FIELD_NUMBER: _ClassVar[int]
     SHARE_STATE_FIELD_NUMBER: _ClassVar[int]
+    STOP_FIELD_NUMBER: _ClassVar[int]
     type: EventType
     hello: HelloEvent
     evaluate: EvaluateEvent
     optimize: OptimizeEvent
     initialize: InitializeEvent
     share_state: ShareStateEvent
+    stop: StopEvent
     def __init__(
         self,
         type: _Optional[_Union[EventType, str]] = ...,
@@ -146,6 +164,7 @@ class SubscribeResponse(_message.Message):
         optimize: _Optional[_Union[OptimizeEvent, _Mapping]] = ...,
         initialize: _Optional[_Union[InitializeEvent, _Mapping]] = ...,
         share_state: _Optional[_Union[ShareStateEvent, _Mapping]] = ...,
+        stop: _Optional[_Union[StopEvent, _Mapping]] = ...,
     ) -> None: ...
 
 class HeartbeatRequest(_message.Message):

@@ -24,5 +24,6 @@ pkgs.mkShell {
     python312
     python312Packages.grpcio
     python312Packages.grpcio-tools
+    python312Packages.zstandard
   ];
 }

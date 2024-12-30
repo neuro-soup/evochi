@@ -44,11 +44,11 @@ class Evaluation(_message.Message):
     SLICE_FIELD_NUMBER: _ClassVar[int]
     REWARDS_FIELD_NUMBER: _ClassVar[int]
     slice: Slice
-    rewards: _containers.RepeatedScalarFieldContainer[bytes]
+    rewards: _containers.RepeatedScalarFieldContainer[float]
     def __init__(
         self,
         slice: _Optional[_Union[Slice, _Mapping]] = ...,
-        rewards: _Optional[_Iterable[bytes]] = ...,
+        rewards: _Optional[_Iterable[float]] = ...,
     ) -> None: ...
 
 class HelloEvent(_message.Message):
@@ -88,12 +88,12 @@ class OptimizeEvent(_message.Message):
     REWARDS_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     epoch: int
-    rewards: _containers.RepeatedScalarFieldContainer[bytes]
+    rewards: _containers.RepeatedScalarFieldContainer[float]
     def __init__(
         self,
         task_id: _Optional[str] = ...,
         epoch: _Optional[int] = ...,
-        rewards: _Optional[_Iterable[bytes]] = ...,
+        rewards: _Optional[_Iterable[float]] = ...,
     ) -> None: ...
 
 class InitializeEvent(_message.Message):
@@ -175,14 +175,10 @@ class FinishEvaluationResponse(_message.Message):
     def __init__(self, ok: bool = ...) -> None: ...
 
 class FinishOptimizationRequest(_message.Message):
-    __slots__ = ("task_id", "state")
+    __slots__ = ("task_id",)
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
-    STATE_FIELD_NUMBER: _ClassVar[int]
     task_id: str
-    state: bytes
-    def __init__(
-        self, task_id: _Optional[str] = ..., state: _Optional[bytes] = ...
-    ) -> None: ...
+    def __init__(self, task_id: _Optional[str] = ...) -> None: ...
 
 class FinishOptimizationResponse(_message.Message):
     __slots__ = ("ok",)

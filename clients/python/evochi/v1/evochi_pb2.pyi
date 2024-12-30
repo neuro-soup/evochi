@@ -52,32 +52,38 @@ class Evaluation(_message.Message):
     ) -> None: ...
 
 class HelloEvent(_message.Message):
-    __slots__ = ("id", "token", "population_size", "state")
+    __slots__ = ("id", "token", "population_size", "heartbeat_interval", "state")
     ID_FIELD_NUMBER: _ClassVar[int]
     TOKEN_FIELD_NUMBER: _ClassVar[int]
     POPULATION_SIZE_FIELD_NUMBER: _ClassVar[int]
+    HEARTBEAT_INTERVAL_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     id: str
     token: str
     population_size: int
+    heartbeat_interval: int
     state: bytes
     def __init__(
         self,
         id: _Optional[str] = ...,
         token: _Optional[str] = ...,
         population_size: _Optional[int] = ...,
+        heartbeat_interval: _Optional[int] = ...,
         state: _Optional[bytes] = ...,
     ) -> None: ...
 
 class EvaluateEvent(_message.Message):
-    __slots__ = ("task_id", "slices")
+    __slots__ = ("task_id", "epoch", "slices")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    EPOCH_FIELD_NUMBER: _ClassVar[int]
     SLICES_FIELD_NUMBER: _ClassVar[int]
     task_id: str
+    epoch: int
     slices: _containers.RepeatedCompositeFieldContainer[Slice]
     def __init__(
         self,
         task_id: _Optional[str] = ...,
+        epoch: _Optional[int] = ...,
         slices: _Optional[_Iterable[_Union[Slice, _Mapping]]] = ...,
     ) -> None: ...
 
@@ -103,10 +109,14 @@ class InitializeEvent(_message.Message):
     def __init__(self, task_id: _Optional[str] = ...) -> None: ...
 
 class ShareStateEvent(_message.Message):
-    __slots__ = ("task_id",)
+    __slots__ = ("task_id", "epoch")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    EPOCH_FIELD_NUMBER: _ClassVar[int]
     task_id: str
-    def __init__(self, task_id: _Optional[str] = ...) -> None: ...
+    epoch: int
+    def __init__(
+        self, task_id: _Optional[str] = ..., epoch: _Optional[int] = ...
+    ) -> None: ...
 
 class SubscribeRequest(_message.Message):
     __slots__ = ("cores",)

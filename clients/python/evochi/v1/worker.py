@@ -16,43 +16,63 @@ class Eval(NamedTuple):
     rewards: list[float]
 
 
-type EvalFn = Callable[[list[slice]], list[Eval]]
-type InitFn = Callable[[], Any]
-type OptimizeFn = Callable[[list[float]], Any]
+type EvalFn[S] = Callable[[Worker[S], int, list[slice]], list[Eval]]
+type InitFn[S] = Callable[[Worker[S]], Any]
+type OptimizeFn[S] = Callable[[Worker[S], int, list[float]], Any]
 
 
-class Worker:
+class Worker[S]:
     def __init__(
         self,
         channel: grpc.Channel,
         cores: int,
-        evaluate: EvalFn,
-        initialize: InitFn,
-        optimize: OptimizeFn,
-        heartbeat_interval: float = 10,
+        evaluate: EvalFn[S],
+        initialize: InitFn[S],
+        optimize: OptimizeFn[S],
     ) -> None:
         """Initializes the client to interact with the server via the given channel.
 
         Args:
             channel: The gRPC channel to use for communication.
             cores: The number of cores to use for evaluation.
-            eval_fn: A function that evaluates slices of the population.
-            init_fn: A function that initializes the state.
+            evaluate: A function that evaluates slices of the population upon request.
+            initialize: A function that initializes the state upon request.
+            optimize: A function that makes optimization steps upon request.
         """
         self._channel = channel
-        self._stub = client.EvochiServiceStub(channel)
         self._cores = cores
         self._evaluate = evaluate
         self._initialize = initialize
         self._optimize = optimize
-        self._heartbeat_interval = heartbeat_interval
+        self._stub = client.EvochiServiceStub(channel)
         self._heartbeat_seq_id = 0
         self._closed = False
         self._token: str | None = None
-        self._current_state: Any | None = None
+        self._pop_size: int | None = None
+        self._heartbeat_interval: int = 0
+        self._current_state: S | None = None
+
+    @property
+    def cores(self) -> int:
+        return self._cores
+
+    @property
+    def pop_size(self) -> int:
+        if self._pop_size is None:
+            raise RuntimeError("Worker has not been initialized yet")
+        return self._pop_size
+
+    @property
+    def state(self) -> S:
+        if self._current_state is None:
+            raise RuntimeError("Worker has not been initialized yet")
+        return self._current_state
 
     async def close(self) -> None:
         """Closes the client's channel."""
+        if self._closed:
+            raise RuntimeError("Worker is already closed")
+        logging.debug("Closing worker")
         self._closed = True
         await self._channel.close()
 
@@ -68,7 +88,6 @@ class Worker:
     async def _keep_alive(self) -> None:
         """Sends a heartbeat to the server periodically."""
         while not self._closed:
-            # TODO: something is wrong here, only two heartbeats are sent
             self._heartbeat_seq_id += 1
             await self._heartbeat(v1.HeartbeatRequest(seq_id=self._heartbeat_seq_id))
             await asyncio.sleep(self._heartbeat_interval)
@@ -86,6 +105,8 @@ class Worker:
                     await self._handle_eval_event(event.evaluate)
                 case v1.EVENT_TYPE_SHARE_STATE:
                     await self._handle_share_state_event(event.share_state)
+                case v1.EVENT_TYPE_OPTIMIZE:
+                    await self._handle_optimize_event(event.optimize)
                 case _:
                     logging.warning("Received unknown event type %s", event.type)
 
@@ -95,12 +116,17 @@ class Worker:
             "Received hello event with id %s and token %s", event.id, event.token
         )
         self._token = event.token
+        self._heartbeat_interval = event.heartbeat_interval
+        self._pop_size = event.population_size
+        self._current_state = (
+            self._decompress_state(event.state) if event.state else None
+        )
         asyncio.create_task(self._keep_alive())  # TODO: is this correct?
 
     async def _handle_init_event(self, event: v1.InitializeEvent) -> None:
         """Handles an init event from the server."""
         logging.debug("Received init event with task id %s", event.task_id)
-        state = self._initialize()
+        state = self._initialize(self)
         self._current_state = state
         await self._finish_initialization(
             v1.FinishInitializationRequest(
@@ -112,7 +138,11 @@ class Worker:
     async def _handle_eval_event(self, event: v1.EvaluateEvent) -> None:
         """Handles an eval event from the server."""
         logging.debug("Received eval event with task id %s", event.task_id)
-        evals = self._evaluate([slice(sl.start, sl.end) for sl in event.slices])
+        evals = self._evaluate(
+            self,
+            event.epoch,
+            [slice(sl.start, sl.end) for sl in event.slices],
+        )
         await self._finish_evaluation(
             v1.FinishEvaluationRequest(
                 task_id=event.task_id,
@@ -126,7 +156,7 @@ class Worker:
     async def _handle_optimize_event(self, event: v1.OptimizeEvent) -> None:
         """Handles an optimize event from the server."""
         logging.debug("Received optimize event with task id %s", event.task_id)
-        optimized = self._optimize(list(event.rewards))
+        optimized = self._optimize(self, event.epoch, list(event.rewards))
         self._current_state = optimized
         await self._finish_optimization(
             v1.FinishOptimizationRequest(task_id=event.task_id)
@@ -155,6 +185,7 @@ class Worker:
         Returns:
             An iterable of subscribe responses received from the server.
         """
+        logging.debug("Subscribing to events")
         return self._stub.Subscribe(request)
 
     async def _heartbeat(self, request: v1.HeartbeatRequest) -> v1.HeartbeatResponse:
@@ -166,6 +197,7 @@ class Worker:
         Returns:
             The heartbeat response received from the server.
         """
+        logging.debug("Sending heartbeat")
         return await self._stub.Heartbeat(request, metadata=self._metadata())
 
     async def _finish_evaluation(
@@ -180,6 +212,7 @@ class Worker:
         Returns:
             The finish evaluation response received from the server.
         """
+        logging.debug("Sending finish evaluation")
         return await self._stub.FinishEvaluation(request, metadata=self._metadata())
 
     async def _finish_optimization(
@@ -194,6 +227,7 @@ class Worker:
         Returns:
             The finish optimization response received from the server.
         """
+        logging.debug("Sending finish optimization")
         return await self._stub.FinishOptimization(request, metadata=self._metadata())
 
     async def _finish_initialization(
@@ -208,6 +242,7 @@ class Worker:
         Returns:
             The finish initialization response received from the server.
         """
+        logging.debug("Sending finish initialization")
         return await self._stub.FinishInitialization(request, metadata=self._metadata())
 
     async def _finish_share_state(
@@ -222,11 +257,16 @@ class Worker:
         Returns:
             The finish share state response received from the server.
         """
+        logging.debug("Sending finish share state")
         return await self._stub.FinishShareState(request, metadata=self._metadata())
 
     def _compressed_state(self) -> bytes:
         """Returns the current state compressed using zstandard."""
         return zstd.compress(pickle.dumps(self._current_state))
+
+    def _decompress_state(self, state: bytes) -> S:
+        """Returns the current state decompressed using zstandard."""
+        return pickle.loads(zstd.decompress(state))
 
     def _metadata(self) -> list[tuple[str, str]]:
         """Returns the metadata to use for requests to the server."""
@@ -234,22 +274,5 @@ class Worker:
             raise RuntimeError("Client does not have a token yet")
         return [("authorization", f"Bearer {self._token}")]
 
-
-async def _main() -> None:
-    logging.basicConfig(level=logging.DEBUG)
-
-    channel = grpc.insecure_channel("localhost:8080")
-    client = Worker(
-        channel,
-        cores=12,
-        evaluate=lambda _: [],
-        initialize=lambda: None,
-        optimize=lambda _: None,
-    )
-    await client.start()
-
-
-if __name__ == "__main__":
-    asyncio.run(_main())
 
 __all__ = ["Worker"]

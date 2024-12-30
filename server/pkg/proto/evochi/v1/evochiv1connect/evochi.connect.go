@@ -46,6 +46,9 @@ const (
 	// EvochiServiceFinishInitializationProcedure is the fully-qualified name of the EvochiService's
 	// FinishInitialization RPC.
 	EvochiServiceFinishInitializationProcedure = "/evochi.v1.EvochiService/FinishInitialization"
+	// EvochiServiceFinishShareStateProcedure is the fully-qualified name of the EvochiService's
+	// FinishShareState RPC.
+	EvochiServiceFinishShareStateProcedure = "/evochi.v1.EvochiService/FinishShareState"
 )
 
 // EvochiServiceClient is a client for the evochi.v1.EvochiService service.
@@ -60,6 +63,8 @@ type EvochiServiceClient interface {
 	FinishOptimization(context.Context, *connect_go.Request[v1.FinishOptimizationRequest]) (*connect_go.Response[v1.FinishOptimizationResponse], error)
 	// finish the initialization
 	FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error)
+	// finish the state sharing
+	FinishShareState(context.Context, *connect_go.Request[v1.FinishShareStateRequest]) (*connect_go.Response[v1.FinishShareStateResponse], error)
 }
 
 // NewEvochiServiceClient constructs a client for the evochi.v1.EvochiService service. By default,
@@ -97,6 +102,11 @@ func NewEvochiServiceClient(httpClient connect_go.HTTPClient, baseURL string, op
 			baseURL+EvochiServiceFinishInitializationProcedure,
 			opts...,
 		),
+		finishShareState: connect_go.NewClient[v1.FinishShareStateRequest, v1.FinishShareStateResponse](
+			httpClient,
+			baseURL+EvochiServiceFinishShareStateProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -107,6 +117,7 @@ type evochiServiceClient struct {
 	finishEvaluation     *connect_go.Client[v1.FinishEvaluationRequest, v1.FinishEvaluationResponse]
 	finishOptimization   *connect_go.Client[v1.FinishOptimizationRequest, v1.FinishOptimizationResponse]
 	finishInitialization *connect_go.Client[v1.FinishInitializationRequest, v1.FinishInitializationResponse]
+	finishShareState     *connect_go.Client[v1.FinishShareStateRequest, v1.FinishShareStateResponse]
 }
 
 // Subscribe calls evochi.v1.EvochiService.Subscribe.
@@ -134,6 +145,11 @@ func (c *evochiServiceClient) FinishInitialization(ctx context.Context, req *con
 	return c.finishInitialization.CallUnary(ctx, req)
 }
 
+// FinishShareState calls evochi.v1.EvochiService.FinishShareState.
+func (c *evochiServiceClient) FinishShareState(ctx context.Context, req *connect_go.Request[v1.FinishShareStateRequest]) (*connect_go.Response[v1.FinishShareStateResponse], error) {
+	return c.finishShareState.CallUnary(ctx, req)
+}
+
 // EvochiServiceHandler is an implementation of the evochi.v1.EvochiService service.
 type EvochiServiceHandler interface {
 	// join the work force and subscribe to events
@@ -146,6 +162,8 @@ type EvochiServiceHandler interface {
 	FinishOptimization(context.Context, *connect_go.Request[v1.FinishOptimizationRequest]) (*connect_go.Response[v1.FinishOptimizationResponse], error)
 	// finish the initialization
 	FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error)
+	// finish the state sharing
+	FinishShareState(context.Context, *connect_go.Request[v1.FinishShareStateRequest]) (*connect_go.Response[v1.FinishShareStateResponse], error)
 }
 
 // NewEvochiServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -180,6 +198,11 @@ func NewEvochiServiceHandler(svc EvochiServiceHandler, opts ...connect_go.Handle
 		svc.FinishInitialization,
 		opts...,
 	))
+	mux.Handle(EvochiServiceFinishShareStateProcedure, connect_go.NewUnaryHandler(
+		EvochiServiceFinishShareStateProcedure,
+		svc.FinishShareState,
+		opts...,
+	))
 	return "/evochi.v1.EvochiService/", mux
 }
 
@@ -204,4 +227,8 @@ func (UnimplementedEvochiServiceHandler) FinishOptimization(context.Context, *co
 
 func (UnimplementedEvochiServiceHandler) FinishInitialization(context.Context, *connect_go.Request[v1.FinishInitializationRequest]) (*connect_go.Response[v1.FinishInitializationResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("evochi.v1.EvochiService.FinishInitialization is not implemented"))
+}
+
+func (UnimplementedEvochiServiceHandler) FinishShareState(context.Context, *connect_go.Request[v1.FinishShareStateRequest]) (*connect_go.Response[v1.FinishShareStateResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("evochi.v1.EvochiService.FinishShareState is not implemented"))
 }

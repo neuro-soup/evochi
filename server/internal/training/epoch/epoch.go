@@ -30,7 +30,7 @@ type Epoch struct {
 
 	// rewards are the collected rewards for this epoch. Its size is equal to
 	// the population.
-	rewards []eval.Reward
+	rewards []float64
 }
 
 // New creates a new epoch.
@@ -46,7 +46,7 @@ func New(number, population uint, initState eval.State) *Epoch {
 				End:   population,
 			},
 		),
-		rewards: make([]eval.Reward, population),
+		rewards: make([]float64, population),
 	}
 }
 
@@ -99,32 +99,38 @@ func (e *Epoch) Assign(w worker) []eval.Slice {
 	return slices
 }
 
-func (e *Epoch) Reward(w worker, slices []eval.Slice, rewards []eval.Reward) error {
+func (e *Epoch) Reward(w worker, evals []eval.Eval) error {
 	workerID, workerCores := w.WorkerID(), w.WorkerCores()
-
-	width := eval.TotalSliceWidth(slices)
-	if len(rewards) != int(width) {
-		slog.Error("invalid number of rewards",
-			"epoch", e.Number,
-			"worker", workerID,
-			"slices", width,
-			"got", len(rewards),
-		)
-		return fmt.Errorf("expected %d rewards, got %d", width, len(rewards))
-	}
-
 	slog.Debug("rewarding epoch for slices",
 		"worker", workerID,
 		"cores", workerCores,
-		"slices", len(slices),
-		"rewards", len(rewards),
+		"evals", evals,
 	)
 
-	for _, slice := range slices {
-		for i := slice.Start; i < slice.End; i++ {
-			e.rewards[i] = rewards[i-slice.Start]
+	overlap := eval.SliceOverlaps(eval.EvalSlices(evals...)...)
+	if overlap != nil {
+		slog.Error("overlapping slices",
+			"worker", workerID,
+			"cores", workerCores,
+			"overlap", *overlap,
+		)
+		return fmt.Errorf("overlapping slices: %v", *overlap)
+	}
+
+	for _, eval := range evals {
+		for i := eval.Slice.Start; i < eval.Slice.End; i++ {
+			e.rewards[i] += eval.Rewards[i-eval.Slice.Start]
 		}
 	}
 
 	return nil
+}
+
+// Unassign puts back the given slices to the unassigned stack.
+func (e *Epoch) Unassign(slices ...eval.Slice) {
+	e.unassigned.PushAll(slices...)
+}
+
+func (e *Epoch) Rewards() []float64 {
+	return e.rewards
 }

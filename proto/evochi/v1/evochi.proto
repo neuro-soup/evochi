@@ -12,12 +12,21 @@ message Slice {
   int32 end = 2;
 }
 
+message Evaluation {
+  // the evaluated slice
+  Slice slice = 1;
+
+  // the rewards for each evaluated slice
+  repeated float rewards = 2;
+}
+
 enum EventType {
   EVENT_TYPE_UNSPECIFIED = 0;
   EVENT_TYPE_HELLO = 1;
   EVENT_TYPE_EVALUATE = 3;
   EVENT_TYPE_OPTIMIZE = 4;
   EVENT_TYPE_INITIALIZE = 5;
+  EVENT_TYPE_SHARE_STATE = 6;
 }
 
 // the server welcomes and initialises the worker
@@ -32,9 +41,13 @@ message HelloEvent {
   // total population size
   int32 population_size = 3;
 
+  // the heartbeat interval in seconds in which the worker sends heartbeats to
+  // the server.
+  int32 heartbeat_interval = 4;
+
   // the initial state of the worker, where the encoding value is up to the
   // workers. if nil, the worker is the first one to join the work force.
-  optional bytes state = 4;
+  optional bytes state = 5;
 }
 
 // the server requests the worker to evaluate a slice
@@ -42,8 +55,11 @@ message EvaluateEvent {
   // the id of the evaluation
   string task_id = 1;
 
+  // the current epoch
+  int32 epoch = 2;
+
   // the slices to be evaluated
-  repeated Slice slices = 2;
+  repeated Slice slices = 3;
 }
 
 // the server requests the worker to optimize its parameters
@@ -54,13 +70,8 @@ message OptimizeEvent {
   // the current epoch
   int32 epoch = 2;
 
-  // whether to send the optimized state to the server after the optimization
-  // step
-  bool share_state = 3;
-
-  // the accumulated rewards in the current epoch, where the encoding value
-  // is up to the workers
-  repeated bytes rewards = 4;
+  // the accumulated rewards in the current epoch
+  repeated float rewards = 3;
 }
 
 // the server requests the worker to create the initial state and send it to the
@@ -68,6 +79,15 @@ message OptimizeEvent {
 message InitializeEvent {
   // the id of the initialization
   string task_id = 1;
+}
+
+// the server requests the worker to share its state with the server
+message ShareStateEvent {
+  // the id of the state
+  string task_id = 1;
+
+  // the current epoch
+  int32 epoch = 2;
 }
 
 // the client asks the server to join the work force
@@ -86,6 +106,7 @@ message SubscribeResponse {
     EvaluateEvent evaluate = 3;
     OptimizeEvent optimize = 4;
     InitializeEvent initialize = 5;
+    ShareStateEvent share_state = 6;
   }
 }
 
@@ -109,9 +130,9 @@ message FinishEvaluationRequest {
   // the id of the evaluation
   string task_id = 1;
 
-  // the rewards for each evaluated slice, where the encoding value is up to
-  // the workers
-  repeated bytes rewards = 2;
+  // the evaluations for each evaluated slice. the slices must match the slices
+  // that were assigned to the task via `EvaluateEvent.slices`.
+  repeated Evaluation evaluations = 2;
 }
 
 // the server acknowledges that the evaluation has finished
@@ -124,13 +145,6 @@ message FinishEvaluationResponse {
 message FinishOptimizationRequest {
   // the id of the evaluation
   string task_id = 1;
-
-  // the optimized state of the worker, where the encoding value is up to the
-  // workers
-  //
-  // only workers with `OptimizeEvent.share_state = true` must send their
-  // optimized state to the server
-  optional bytes state = 2;
 }
 
 // the server acknowledges that the optimization has finished
@@ -157,6 +171,20 @@ message FinishInitializationResponse {
   bool ok = 1;
 }
 
+// the client shares its state with the server
+message FinishShareStateRequest {
+  // the id of the state
+  string task_id = 1;
+
+  // the state to share, where the encoding value is up to the workers
+  bytes state = 2;
+}
+
+message FinishShareStateResponse {
+  // whether the state was successfully shared
+  bool ok = 1;
+}
+
 service EvochiService {
   // join the work force and subscribe to events
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
@@ -172,4 +200,7 @@ service EvochiService {
 
   // finish the initialization
   rpc FinishInitialization(FinishInitializationRequest) returns (FinishInitializationResponse) {}
+
+  // finish the state sharing
+  rpc FinishShareState(FinishShareStateRequest) returns (FinishShareStateResponse) {}
 }

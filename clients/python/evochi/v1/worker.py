@@ -58,11 +58,15 @@ class Worker[S]:
         self._current_state: S | None = None
 
     @property
+    def ready(self) -> bool:
+        return self._token is not None
+
+    @property
     def cores(self) -> int:
         return self._cores
 
     @property
-    def pop_size(self) -> int:
+    def population_size(self) -> int:
         if self._pop_size is None:
             raise RuntimeError("Worker has not been initialized yet")
         return self._pop_size

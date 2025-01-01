@@ -10,7 +10,6 @@ from typing import cast
 import asyncio
 from dataclasses import dataclass
 import os
-import time
 
 from evochi.v1 import Worker, Eval
 
@@ -31,7 +30,6 @@ def f(w) -> np.ndarray:
     # the L2 distance to a specific solution vector. So the highest reward
     # we can achieve is 0, when the vector w is exactly equal to solution
     reward = -np.sum(np.square(solution - w))
-    # time.sleep(0.1)
     return reward
 
 
@@ -48,8 +46,10 @@ class State:
     N: np.ndarray
 
 
-def initialize(w: Worker[State]) -> State:
-    return State(weights=np.random.randn(3), N=np.random.randn(w.pop_size, 3))
+def initialize(worker: Worker[State]) -> State:
+    return State(
+        weights=np.random.randn(3), N=np.random.randn(worker.population_size, 3)
+    )
 
 
 def evaluate(worker: Worker[State], _: int, slices: list[slice]) -> list[Eval]:
@@ -68,7 +68,7 @@ def optimize(worker: Worker[State], epoch: int, rewards: list[float]) -> State:
     R = np.array(rewards)
     A = (R - np.mean(R)) / np.std(R)
     N = worker.state.N
-    npop = worker.pop_size
+    npop = worker.population_size
     w = worker.state.weights
     w = w + alpha / (npop * sigma) * np.dot(N.T, A)
     if epoch % 20 == 0:

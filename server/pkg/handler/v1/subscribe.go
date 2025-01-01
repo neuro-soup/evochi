@@ -178,9 +178,6 @@ func (h *Handler) handleCancellation(w *worker.Worker) {
 			suc.Tasks.Add(t)
 		case *task.Evaluate:
 			h.epoch.Unassign(t.Slices...)
-			// // TODO: think about whether this should be put back onto epoch
-			// t.RequestedAt = time.Now()
-			// suc.Tasks.Add(t)
 		case *task.ShareState:
 			t.RequestedAt = time.Now()
 			suc.Tasks.Add(t)
@@ -189,6 +186,11 @@ func (h *Handler) handleCancellation(w *worker.Worker) {
 
 	// remove worker from pool
 	w.Remove()
+
+	// re-distribute work load of cancelled worker
+	for _, t := range h.workers.Workers() {
+		h.eval(t)
+	}
 }
 
 // taskToProto converts a task to a proto subscribe response.

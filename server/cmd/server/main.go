@@ -54,11 +54,6 @@ func configureLogger(level slog.Level) {
 func registerV1(cfg *config, mux *http.ServeMux, workers *worker.Pool) {
 	slog.Debug("registering v1 handler")
 
-	attrs := make(map[string][]byte)
-	for key, val := range cfg.Attrs {
-		attrs[key] = []byte(val)
-	}
-
 	v1 := v1.New(
 		v1.Config{
 			JWTSecret:      cfg.JWTSecret,
@@ -66,7 +61,6 @@ func registerV1(cfg *config, mux *http.ServeMux, workers *worker.Pool) {
 			WorkerTimeout:  cfg.WorkerTimeout,
 			MaxEpochs:      cfg.MaxEpochs,
 			PopulationSize: cfg.PopulationSize,
-			Attrs:          attrs,
 		},
 		workers,
 	)

@@ -10,7 +10,7 @@ $$\LARGE {\color{white}\textrm{Evo}}{\color{gray}\textrm{lution~Or}}{\color{whit
 </div>
 
 Evochi is a framework-agnostic distributed training orchestrator for reinforcement
-learning agents, inspired by [OpenAI's Evolution Strategies paper](https://arxiv.org/abs/1703.03864).
+learning agents using [OpenAI's Evolution Strategies](https://arxiv.org/abs/1703.03864).
 
 ## Features
 
@@ -35,9 +35,11 @@ go run github.com/neuro-soup/evochi/cmd/evochi@latest
 > [!IMPORTANT]
 > Evochi requires some environment variables to be set. See the [server README](server/README.md#Environment-Variables) for all configuration options.
 
-**Full (Minimal) Example:**
-
+**Full (minimal) example:**
 ```bash
 EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/cmd/evochi@latest
 ```
 
+## Example Implementations
+
+- [es-torch](https://github.com/neuro-soup/es-torch/tree/main/examples)

@@ -1,5 +1,3 @@
-import os
-from typing import Callable, cast
 import asyncio
 from dataclasses import dataclass
 
@@ -11,7 +9,9 @@ import numpy as np
 import gymnasium as gym
 import torch
 from torch import nn
-from jaxtyping import Float
+
+# TODO: antithetic sampling
+# TODO: logging
 
 
 class SimpleMLP(nn.Module):
@@ -36,19 +36,12 @@ class SimpleMLP(nn.Module):
         return self._net(obs)
 
 
-type SamplingStrategy = Callable[[int, int, torch.Generator], torch.Tensor]
-type RewardTransform = Callable[
-    [Float[torch.Tensor, "n_pop"]],
-    Float[torch.Tensor, "n_pop"],
-]
-
-
 @dataclass
 class State:
     seed: int
+    max_steps: int
     learning_rate: float
     noise_std: float
-    weight_decay: float
     params: torch.Tensor
 
 
@@ -57,96 +50,144 @@ class HalfCheetah(Worker[State]):
         self,
         channel: grpc.Channel,
         cores: int,
-        vectorization: gym.VectorizeMode = gym.VectorizeMode.SYNC,
         device: torch.device = torch.device("cpu"),
+        vectorization_mode: gym.VectorizeMode = gym.VectorizeMode.SYNC,
+        render: bool = False,
     ) -> None:
         super().__init__(
             channel=channel,
             cores=cores,
-            initialize=lambda _: self._initialize(),
-            evaluate=lambda _, __, slices: self._evaluate(slices),
-            optimize=lambda _, epoch, rewards: self._optimize(epoch, rewards),
+            initialize=lambda _: self._handle_init(),
+            evaluate=lambda _, epoch, slices: self._handle_eval(epoch, slices),
+            optimize=lambda _, epoch, rewards: self._handle_optim(epoch, rewards),
         )
         self._device = device
-        self._env = gym.make(
-            "HalfCheetah-v5",
-            num_envs=cores,  # TODO: separate variable?
-            vectorization_mode=vectorization,
-        )
-        self._rng: torch.Generator | None = None
+        self._vectorization_mode = vectorization_mode
+        self._render = render
         self._noise: torch.Tensor | None = None
-        self._mlp: SimpleMLP | None = None
-        self._obs: torch.Tensor = self._env.reset()[0]
+        self._mlp: SimpleMLP = SimpleMLP(obs_dim=17, act_dim=6, hidden_dim=64).to(
+            self._device
+        )
 
-    def _initialize(self) -> State:
+    def _handle_init(self) -> State:
         """Initialize shared information across all workers."""
-        self._mlp = self._empty_mlp()
-        self._generate_noise()
+        seed = np.random.randint(0, 2**32)
         # TODO: make configurable
         return State(
-            seed=np.random.randint(0, 2**32),
+            seed=seed,
+            max_steps=1_000,
             learning_rate=0.1,
             noise_std=0.1,
-            weight_decay=0.1,
             params=nn.utils.parameters_to_vector(self._mlp.parameters()),
         )
 
-    def _prepare(self, slices: list[slice]) -> None:
-        """Prepares this worker for evaluation."""
-        if self._rng is None:
-            self._rng = torch.Generator(device=self._device).manual_seed(
-                self.state.seed
-            )
-        if self._mlp is None:
-            self._mlp = self._mlp_from_params(slices)
-
-    def _evaluate(self, slices: list[slice]) -> list[Eval]:
+    @torch.inference_mode()
+    def _handle_eval(self, epoch: int, slices: list[slice]) -> list[Eval]:
         """Evaluates the model by computing the rewards for each slice."""
-        self._prepare(slices)
+        if self._mlp is None:
+            self._mlp = self._construct_mlp(slices)
+        if self._noise is None:
+            self._generate_noise()
 
-        raise NotImplementedError("not implemented")  # TODO: implement
+        # TODO: vectorise
+        acc_rewards: list[tuple[slice, list[float]]] = []
+        for sl in slices:
+            width = sl.stop - sl.start
+            env = gym.make_vec(
+                "HalfCheetah-v5",
+                num_envs=width,
+                vectorization_mode=self._vectorization_mode,
+                render_mode="human" if self._render else None,
+            )
+            obs, _ = env.reset(seed=self.state.seed)
 
-        actions = self._choose_actions()
-        self._obs, rewards, terminations, truncations, _ = self._env.step(actions)
-        return []
+            dones = np.zeros(width, dtype=bool)
+            returns = np.zeros(width, dtype=np.float32)
 
-    def _optimize(self, _: int, raw_rewards: list[float]) -> State:
-        rewards = self._transform_reward(np.array(raw_rewards))
+            for _ in range(self.state.max_steps):
+                actions = self._choose_actions(obs)
+                obs, reward, terminations, truncations, _ = env.step(actions)
+                dones = dones | terminations | truncations
+                returns += reward * ~dones
+                if dones.all():
+                    break
 
-        raise NotImplementedError("not implemented")  # TODO: implement
+            acc_rewards.append((sl, returns.tolist()))
+
+        return [
+            Eval(
+                slice=slice,
+                rewards=rewards,
+            )
+            for slice, rewards in acc_rewards
+        ]
+
+    def _handle_optim(self, epoch: int, raw_rewards: list[float]) -> State:
+        assert self._mlp is not None, "Cannot optimize without model"
+
+        lr = self.state.learning_rate
+        noise_std = self.state.noise_std
+        epsilon = self._noise
+        pop_size = self.population_size
+
+        rewards = self._transform_reward(torch.tensor(raw_rewards, device=self._device))
+
+        rewards = rewards.unsqueeze(dim=1)
+
+        params = nn.utils.parameters_to_vector(self._mlp.parameters())
+        epsilon = self._noise
+        pert = torch.sum(epsilon * rewards, dim=0)
+
+        # Update
+        self.state.params = params + lr / (pop_size * noise_std) * pert
+        self._mlp = self._construct_mlp([])
+
+        # reset worker state
+        self._noise = None
+        self._rng = None
 
         self._generate_noise()
         return self.state
 
-    def _choose_actions(self) -> np.ndarray:
+    def _choose_actions(self, obs: np.ndarray) -> np.ndarray:
         assert self._mlp is not None, "Cannot determine action without model"
-        # TODO: use old implementation here
-        return self._mlp(self._obs).argmax(dim=1).detach().numpy()
+        # TODO: use old implementation
+        actions: torch.Tensor = self._mlp(
+            torch.from_numpy(obs).float().to(self._device)
+        )
+        return actions.detach().numpy()
 
-    def _mlp_from_params(self, slices: list[slice]) -> SimpleMLP:
-        raise NotImplementedError("not implemented")  # TODO: implement
-        # mlp = self._empty_mlp()
-        # # nn.utils.vector_to_parameters(
-        # #     vec=self._perturb(self.state.params),
-        # #     parameters=mlp.parameters(),
-        # # )
-        # return mlp.to(self._device)
+    def _construct_mlp(self, slices: list[slice]) -> SimpleMLP:
+        mlp = self._mlp
+        nn.utils.vector_to_parameters(
+            vec=self._perturbed_params(slices)
+            if len(slices) > 0
+            else self.state.params,
+            parameters=mlp.parameters(),
+        )
+        return mlp.to(self._device)
+
+    def _perturbed_params(self, slices: list[slice]) -> torch.Tensor:
+        assert self._noise is not None, "Cannot perturb without noise"
+        params = self.state.params
+        sigma = self.state.noise_std
+        eps = self._noise[slices]
+        return params + sigma * eps
 
     def _generate_noise(self) -> None:
         assert self._mlp is not None, "Cannot determine noise without model"
+        rng = torch.Generator(device=self._device).manual_seed(self.state.seed)
         n_params = nn.utils.parameters_to_vector(self._mlp.parameters()).numel()
-        self._noise = torch.randn((self.population_size, n_params), generator=self._rng)
+        self._noise = torch.randn((self.population_size, n_params), generator=rng)
 
-    def _transform_reward(self, rewards: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def _transform_reward(rewards: torch.Tensor) -> torch.Tensor:
         return (rewards - rewards.mean()) / rewards.std()
-
-    def _empty_mlp(self) -> SimpleMLP:
-        return SimpleMLP(obs_dim=4, act_dim=1, hidden_dim=32).to(self._device)
 
 
 async def main() -> None:
     channel = grpc.insecure_channel("localhost:8080")
-    worker = HalfCheetah(channel=channel, cores=cast(int, os.cpu_count()))
+    worker = HalfCheetah(channel=channel, cores=1, render=True)
     await worker.start()
 
 

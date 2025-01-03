@@ -1,9 +1,11 @@
+from datetime import datetime
 from typing import Any, AsyncIterable, Callable, NamedTuple
 
 import logging
 import asyncio
 import pickle
 
+from google.protobuf import timestamp_pb2
 from grpc import StatusCode
 import grpc.aio as grpc
 import zstandard as zstd
@@ -98,7 +100,14 @@ class Worker[S]:
         """Sends a heartbeat to the server periodically."""
         while not self._closed:
             self._heartbeat_seq_id += 1
-            await self._heartbeat(v1.HeartbeatRequest(seq_id=self._heartbeat_seq_id))
+            timestamp = timestamp_pb2.Timestamp()
+            timestamp.FromDatetime(datetime.now())
+            await self._heartbeat(
+                v1.HeartbeatRequest(
+                    seq_id=self._heartbeat_seq_id,
+                    timestamp=timestamp,
+                )
+            )
             await asyncio.sleep(self._heartbeat_interval)
 
     async def _handle_events(self) -> None:

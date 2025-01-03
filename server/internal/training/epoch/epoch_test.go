@@ -176,7 +176,7 @@ func TestEpoch_Reward(t *testing.T) {
 					Start: 3,
 					End:   5,
 				},
-				Rewards: []float64{3, 4, 5},
+				Rewards: []float64{3, 4},
 			},
 		}
 		err := e.Reward(w, evals)

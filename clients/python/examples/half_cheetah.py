@@ -108,7 +108,7 @@ class HalfCheetah(Worker[State]):
         acc_rewards: list[tuple[slice, list[float]]] = []
         offset = 0
         for sl in slices:
-            rewards = returns[offset + sl.start : offset + sl.stop].tolist()
+            rewards = returns[offset : offset + (sl.stop - sl.start)].tolist()
             acc_rewards.append((sl, rewards))
             offset += sl.stop - sl.start
 

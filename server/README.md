@@ -1,5 +1,15 @@
 # server
 
+The server acts as a central point for the distributed training process. The server
+is responsible for accepting connections from workers, keeping track of the current
+state of the training process, and coordinating the training process by assigning
+tasks to workers and removing workers that refuse to participate within the worker
+timeout period.
+
+## Architecture
+
+The server uses [gRPC](https://grpc.io/) to communicate with workers and vice versa. Protobuf definition files can be found inside the [proto directory](../proto).
+
 ## Environment Variables
 
 The server is configurable via environment variables. The following configuration

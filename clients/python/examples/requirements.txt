@@ -1,5 +1,5 @@
 torch
-gymnasium
+gymnasium[mujoco]
 jaxtyping
 numpy
 grpcio

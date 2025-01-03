@@ -10,9 +10,6 @@ import gymnasium as gym
 import torch
 from torch import nn
 
-# TODO: antithetic sampling
-# TODO: logging
-
 
 class SimpleMLP(nn.Module):
     def __init__(self, obs_dim: int, act_dim: int, hidden_dim: int) -> None:
@@ -72,7 +69,6 @@ class HalfCheetah(Worker[State]):
     def _handle_init(self) -> State:
         """Initialize shared information across all workers."""
         seed = np.random.randint(0, 2**32)
-        # TODO: make configurable
         return State(
             seed=seed,
             max_steps=1_000,
@@ -125,6 +121,7 @@ class HalfCheetah(Worker[State]):
         ]
 
     def _handle_optim(self, epoch: int, raw_rewards: list[float]) -> State:
+        """Perform an optimization step."""
         assert self._mlp is not None, "Cannot optimize without model"
 
         lr = self.state.learning_rate
@@ -152,14 +149,16 @@ class HalfCheetah(Worker[State]):
         return self.state
 
     def _choose_actions(self, obs: np.ndarray) -> np.ndarray:
+        """Choose actions based on the given observation."""
         assert self._mlp is not None, "Cannot determine action without model"
-        # TODO: use old implementation
         actions: torch.Tensor = self._mlp(
             torch.from_numpy(obs).float().to(self._device)
         )
         return actions.detach().numpy()
 
     def _construct_mlp(self, slices: list[slice]) -> SimpleMLP:
+        """Constructs a MLP where the parameters at the given slice indices are
+        perturbed."""
         mlp = self._mlp
         nn.utils.vector_to_parameters(
             vec=self._perturbed_params(slices)
@@ -170,6 +169,8 @@ class HalfCheetah(Worker[State]):
         return mlp.to(self._device)
 
     def _perturbed_params(self, slices: list[slice]) -> torch.Tensor:
+        """Perturb the state parameters with noise. The given slice indices are
+        perturbed. The remaining are left untouched."""
         assert self._noise is not None, "Cannot perturb without noise"
         params = self.state.params
         sigma = self.state.noise_std
@@ -177,6 +178,8 @@ class HalfCheetah(Worker[State]):
         return params + sigma * eps
 
     def _generate_noise(self) -> None:
+        """Generate noise for the perturbed parameters. This is done once per
+        epoch."""
         assert self._mlp is not None, "Cannot determine noise without model"
         rng = torch.Generator(device=self._device).manual_seed(self.state.seed)
         n_params = nn.utils.parameters_to_vector(self._mlp.parameters()).numel()
@@ -184,6 +187,7 @@ class HalfCheetah(Worker[State]):
 
     @staticmethod
     def _transform_reward(rewards: torch.Tensor) -> torch.Tensor:
+        """Transform the rewards to be normalized."""
         return (rewards - rewards.mean()) / rewards.std()
 
 

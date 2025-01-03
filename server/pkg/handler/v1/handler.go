@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -85,10 +83,6 @@ func (h *Handler) eval(w *worker.Worker) {
 func (h *Handler) finished() bool {
 	for _, w := range h.workers.Workers() {
 		if !w.Tasks.Idle() {
-			fmt.Println("worker not idleeeeeeeeeeeeeeeeeee")
-			b, _ := json.MarshalIndent(w.Tasks.Tasks(), "", "  ")
-			fmt.Println(string(b))
-			fmt.Println(w.Tasks.Tasks())
 			return false
 		}
 	}

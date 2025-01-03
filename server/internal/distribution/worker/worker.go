@@ -54,7 +54,7 @@ func (w *Worker) Remove() {
 		return
 	}
 	w.removeCh <- struct{}{}
-	close(w.removeCh) // TODO: validate this
+	close(w.removeCh)
 	w.removed = true
 }
 

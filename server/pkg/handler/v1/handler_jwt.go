@@ -33,8 +33,6 @@ func (h *Handler) authenticate(header http.Header) (*Claims, error) {
 		return nil, errors.New("auth: token is empty")
 	}
 
-	fmt.Printf("ToKENE: %q\n", tok)
-
 	token, err := jwt.ParseWithClaims(tok, &Claims{}, h.jwtKey)
 	if err != nil {
 		return nil, fmt.Errorf("auth: failed to parse token: %w", err)

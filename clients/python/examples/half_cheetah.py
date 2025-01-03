@@ -89,30 +89,32 @@ class HalfCheetah(Worker[State]):
         if self._noise is None:
             self._generate_noise()
 
-        # TODO: vectorise
+        total_width = sum(sl.stop - sl.start for sl in slices)
+        env = gym.make_vec(
+            "HalfCheetah-v5",
+            num_envs=total_width,
+            vectorization_mode=self._vectorization_mode,
+            render_mode="human" if self._render else None,
+        )
+        obs, _ = env.reset(seed=self.state.seed)
+
+        dones = np.zeros(total_width, dtype=bool)
+        returns = np.zeros(total_width, dtype=np.float32)
+
+        for _ in range(self.state.max_steps):
+            actions = self._choose_actions(obs)
+            obs, reward, terminations, truncations, _ = env.step(actions)
+            dones = dones | terminations | truncations
+            returns += reward * ~dones
+            if dones.all():
+                break
+
         acc_rewards: list[tuple[slice, list[float]]] = []
+        offset = 0
         for sl in slices:
-            width = sl.stop - sl.start
-            env = gym.make_vec(
-                "HalfCheetah-v5",
-                num_envs=width,
-                vectorization_mode=self._vectorization_mode,
-                render_mode="human" if self._render else None,
-            )
-            obs, _ = env.reset(seed=self.state.seed)
-
-            dones = np.zeros(width, dtype=bool)
-            returns = np.zeros(width, dtype=np.float32)
-
-            for _ in range(self.state.max_steps):
-                actions = self._choose_actions(obs)
-                obs, reward, terminations, truncations, _ = env.step(actions)
-                dones = dones | terminations | truncations
-                returns += reward * ~dones
-                if dones.all():
-                    break
-
-            acc_rewards.append((sl, returns.tolist()))
+            rewards = returns[offset + sl.start : offset + sl.stop].tolist()
+            acc_rewards.append((sl, rewards))
+            offset += sl.stop - sl.start
 
         return [
             Eval(

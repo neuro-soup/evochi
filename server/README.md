@@ -1,5 +1,11 @@
 # server
 
+<div align="center">
+    <img src="https://img.shields.io/badge/Written_In-Go-00acd7?style=for-the-badge&logo=go" alt="Go" />
+</div>
+
+<br />
+
 The server acts as a central point for the distributed training process. It is responsible for accepting connections from workers, keeping track of the current state of the training process, and coordinating that process by assigning tasks to workers and removing them if they refuse to participate within the worker timeout period.
 
 ## Environment Variables
@@ -38,7 +44,7 @@ When connecting, the worker receives a hello event containing the worker ID and 
 authorization: Bearer <token>
 ```
 
-If the worker is the first to join the workforce, the server sends it an initialise event requesting an initial state. The encoding of the state is up to the client; however, it must be consistent across all clients. For example, the Python client uses pickle to serialize the state class, and the resulting bytes are compressed using Zstandard.
+If the worker is the first to join the workforce, the server sends it an initialise event requesting an initial state. The encoding of the state is up to the client; however, it must be consistent across all clients. For example, the Python client uses pickle to serialise the state class, and the resulting bytes are compressed using Zstandard.
 
 Whenever the initialisation phase is over, the worker and other workers receive evaluation events iteratively, requesting them to evaluate one or more slices of the total population (reward) list. The implementation of these evaluations is left to the workers.
 

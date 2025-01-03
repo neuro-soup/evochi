@@ -118,6 +118,13 @@ func (e *Epoch) Reward(w worker, evals []eval.Eval) error {
 	}
 
 	for _, eval := range evals {
+		width := eval.Slice.End - eval.Slice.Start
+		if len(eval.Rewards) != int(width) {
+			return fmt.Errorf(
+				"invalid reward length for [%d, %d] %d, expected %d",
+				eval.Slice.Start, eval.Slice.End, len(eval.Rewards), width,
+			)
+		}
 		for i := eval.Slice.Start; i < eval.Slice.End; i++ {
 			e.rewards[i] += eval.Rewards[i-eval.Slice.Start]
 		}

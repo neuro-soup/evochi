@@ -40,6 +40,6 @@ go run github.com/neuro-soup/evochi/cmd/evochi@latest
 EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/cmd/evochi@latest
 ```
 
-## Example Implementations
+## (Real-World) Example Implementations
 
-- [es-torch](https://github.com/neuro-soup/es-torch/tree/main/examples)
+- [es-torch](https://github.com/neuro-soup/es-torch)

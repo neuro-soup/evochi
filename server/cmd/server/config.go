@@ -33,9 +33,6 @@ type config struct {
 
 	// PopulationSize is the size of the population to use.
 	PopulationSize uint `split_words:"true" required:"true"`
-
-	// Attrs are the custom attributes to use.
-	Attrs map[string]string `split_words:"true"`
 }
 
 func loadConfig() (*config, error) {

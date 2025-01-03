@@ -30,9 +30,6 @@ type Config struct {
 
 	// PopulationSize is the size of the population to use.
 	PopulationSize uint
-
-	// Attrs are the custom attributes to use.
-	Attrs map[string][]byte
 }
 
 type Handler struct {

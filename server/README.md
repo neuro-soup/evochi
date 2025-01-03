@@ -23,6 +23,26 @@ options are available:
 | `EVOCHI_MAX_WORKERS`    | `uint`                                 | `0`    | The maximum number of workers to run. If set to 0, no limit is set.                          |
 | `EVOCHI_MAX_EPOCHS`     | `uint`                                 | `0`    | The maximum number of epochs to run. If set to 0, no limit is set.                           |
 
+## Running
+
+Binary releases are available on [GitHub](https://github.com/neuro-soup/evochi/releases).
+
+To run from (master) source, the `go run` command can be used:
+
+```bash
+go run github.com/neuro-soup/evochi/server/cmd/server@latest
+```
+
+> [!IMPORTANT]
+> The server requires some environment variables to be set, which can be found
+> above.
+
+**Full (Minimal) Example:**
+
+```bash
+EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/cmd/evochi@latest
+```
+
 ## Communication
 
 The server uses [gRPC](https://grpc.io/) to communicate with workers and vice versa. Protobuf definition
@@ -48,7 +68,7 @@ If the worker is the first to join the workforce, the server sends it an initial
 
 Whenever the initialisation phase is over, the worker and other workers receive evaluation events iteratively, requesting them to evaluate one or more slices of the total population (reward) list. The implementation of these evaluations is left to the workers.
 
-> **Important**
+> [!IMPORTANT]
 > The maximum size of the slices is equal to the worker's cores field set when connecting to the server.
 
 As soon as all slices are completed, optimisation events are sent to all workers. After all workers have finished optimising, one is elected to send its current state to the server so that new workers can participate in the future.
@@ -58,3 +78,4 @@ The evaluation and optimization loop repeats as long as the maximum number of ep
 ## Fault Tolerance
 
 Since this is a [client-server model](https://en.wikipedia.org/wiki/Client%E2%80%93server_model), the server itself represents a single point of failure. The task distribution to workers, however, is implemented in a fault-tolerant manner. As soon as a worker disconnects with a mission-critical task (such as initialization or evaluation), the task is delegated to other workers. If no other workers are available, the server is reset, and a new experiment can begin.
+

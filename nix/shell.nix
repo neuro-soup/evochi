@@ -10,6 +10,7 @@ pkgs.mkShell rec {
     gotools
     gofumpt
     golangci-lint
+    goreleaser
 
     # general
     just

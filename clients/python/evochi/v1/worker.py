@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import pickle
+from abc import abstractmethod
 from datetime import datetime
-from typing import Any, AsyncIterable, Callable, NamedTuple
+from functools import wraps
+from typing import AsyncIterable, NamedTuple
 
 import evochi.v1.evochi_pb2 as v1
 import evochi.v1.evochi_pb2_grpc as client
@@ -10,6 +12,21 @@ import grpc.aio as grpc
 import zstandard as zstd
 from google.protobuf import timestamp_pb2
 from grpc import StatusCode
+
+
+def once(fn):
+    """Decorator that ensures a function is only called once."""
+    called = False
+
+    @wraps(fn)
+    def inner(x):
+        nonlocal called
+        if called:
+            return
+        called = True
+        return fn(x)
+
+    return inner
 
 
 class Eval(NamedTuple):
@@ -55,6 +72,7 @@ class Worker[S]:
             raise RuntimeError("Worker has not been initialized yet")
         return self._current_state
 
+    @once
     @abstractmethod
     def initialize(self) -> S:
         """Hook that is called for the first worker to initialize the state."""
@@ -79,7 +97,6 @@ class Worker[S]:
         await self._channel.close()
 
     async def start(self) -> None:
-        """Starts the worker."""
         logging.debug("Starting worker with %d cores, waiting to be ready...", self._cores)
         await self._channel.channel_ready()
         logging.debug("Worker ready, starting...")
@@ -135,7 +152,7 @@ class Worker[S]:
 
     async def _handle_init_event(self, event: v1.InitializeEvent) -> None:
         logging.debug("Received init event with task id %s", event.task_id)
-        state = self._initialize()
+        state = self.initialize()
         self._current_state = state
         await self._finish_initialization(
             v1.FinishInitializationRequest(
@@ -146,7 +163,7 @@ class Worker[S]:
 
     async def _handle_eval_event(self, event: v1.EvaluateEvent) -> None:
         logging.debug("Received eval event with task id %s", event.task_id)
-        evals = self._evaluate(epoch=event.epoch, slices=[slice(sl.start, sl.end) for sl in event.slices])
+        evals = self.evaluate(epoch=event.epoch, slices=[slice(sl.start, sl.end) for sl in event.slices])
         await self._finish_evaluation(
             v1.FinishEvaluationRequest(
                 task_id=event.task_id,
@@ -156,7 +173,7 @@ class Worker[S]:
 
     async def _handle_optimize_event(self, event: v1.OptimizeEvent) -> None:
         logging.debug("Received optimize event with task id %s", event.task_id)
-        optimized = self._optimize(self, event.epoch, list(event.rewards))
+        optimized = self.optimize(epoch=event.epoch, rewards=list(event.rewards))
         self._current_state = optimized
         await self._finish_optimization(v1.FinishOptimizationRequest(task_id=event.task_id))
 
@@ -172,7 +189,7 @@ class Worker[S]:
 
     async def _handle_stop_event(self, event: v1.StopEvent) -> None:
         logging.debug("Received stop event with task id %s", event.task_id)
-        self._stop()
+        self.stop()
 
     def _subscribe(self, request: v1.SubscribeRequest) -> AsyncIterable[v1.SubscribeResponse]:
         logging.debug("Subscribing to events")

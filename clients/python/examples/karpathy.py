@@ -6,13 +6,12 @@ gaussian of fixed standard deviation.
 Originally from https://gist.github.com/karpathy/77fbb6a8dac5395f1b73e7a89300318d
 """
 
-from typing import cast
 import asyncio
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+from typing import cast
 
-from evochi.v1 import Worker, Eval
-
+import evochi.v1 as evochi
 import grpc.aio as grpc
 import numpy as np
 
@@ -46,45 +45,36 @@ class State:
     N: np.ndarray
 
 
-def initialize(worker: Worker[State]) -> State:
-    return State(
-        weights=np.random.randn(3), N=np.random.randn(worker.population_size, 3)
-    )
+class Worker(evochi.Worker[State]):
+    def initialize(self) -> State:
+        return State(weights=np.random.randn(3), N=np.random.randn(self.population_size, 3))
 
+    def evaluate(self, epoch: int, slices: list[slice]) -> list[evochi.Eval]:
+        N = self.state.N
+        evals: list[evochi.Eval] = []
+        for sl in slices:
+            rewards: list[float] = []
+            for j in range(sl.start, sl.stop):
+                w_try = self.state.weights + sigma * N[j]
+                rewards.append(f(w_try).item())
+            evals.append(evochi.Eval(slice=sl, rewards=rewards))
+        return evals
 
-def evaluate(worker: Worker[State], _: int, slices: list[slice]) -> list[Eval]:
-    N = worker.state.N
-    evals: list[Eval] = []
-    for sl in slices:
-        rewards: list[float] = []
-        for j in range(sl.start, sl.stop):
-            w_try = worker.state.weights + sigma * N[j]
-            rewards.append(f(w_try).item())
-        evals.append(Eval(slice=sl, rewards=rewards))
-    return evals
-
-
-def optimize(worker: Worker[State], epoch: int, rewards: list[float]) -> State:
-    R = np.array(rewards)
-    A = (R - np.mean(R)) / np.std(R)
-    N = worker.state.N
-    npop = worker.population_size
-    w = worker.state.weights
-    w = w + alpha / (npop * sigma) * np.dot(N.T, A)
-    if epoch % 20 == 0:
-        print("epoch %d. w: %s, reward: %f" % (epoch, str(w), f(w)))
-    return State(weights=w, N=np.random.randn(npop, 3))
+    def optimize(self, epoch: int, rewards: list[float]) -> State:
+        R = np.array(rewards)
+        A = (R - np.mean(R)) / np.std(R)
+        N = self.state.N
+        npop = self.population_size
+        w = self.state.weights
+        w = w + alpha / (npop * sigma) * np.dot(N.T, A)
+        if epoch % 20 == 0:
+            print("epoch %d. w: %s, reward: %f" % (epoch, str(w), f(w)))
+        return State(weights=w, N=np.random.randn(npop, 3))
 
 
 async def main() -> None:
     channel = grpc.insecure_channel("localhost:8080")
-    worker = Worker(
-        channel=channel,
-        cores=cast(int, os.cpu_count()),
-        evaluate=evaluate,
-        initialize=initialize,
-        optimize=optimize,
-    )
+    worker = Worker(channel=channel, cores=cast(int, os.cpu_count()))
     await worker.start()
 
 

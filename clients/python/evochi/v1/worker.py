@@ -35,7 +35,6 @@ class Worker[S]:
         self._pop_size: int | None = None
         self._heartbeat_interval: int = 0
         self._current_state: S | None = None
-        self._initialized: bool = False
 
     @property
     def ready(self) -> bool:
@@ -60,6 +59,10 @@ class Worker[S]:
     @abstractmethod
     def initialize(self) -> S:
         """Hook that is called for the first worker to initialize the state."""
+
+    @abstractmethod
+    def hello(self) -> None:
+        """Hook that is called when the worker received the shared state to initialize from."""
 
     @abstractmethod
     def evaluate(self, epoch: int, slices: list[slice]) -> list[Eval]:
@@ -132,13 +135,10 @@ class Worker[S]:
         self._heartbeat_interval = event.heartbeat_interval
         self._pop_size = event.population_size
         self._current_state = self._decompress_state(event.state) if event.state else None
+        self.hello()
         asyncio.create_task(self._keep_alive())  # TODO: is this correct?
 
     async def _handle_init_event(self, event: v1.InitializeEvent) -> None:
-        if self._initialized:
-            logging.warning("Received init event but worker is already initialized")
-            return
-        self._initialized = True
         logging.debug("Received init event with task id %s", event.task_id)
         state = self.initialize()
         self._current_state = state

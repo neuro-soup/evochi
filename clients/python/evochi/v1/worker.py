@@ -3,7 +3,6 @@ import logging
 import pickle
 from abc import abstractmethod
 from datetime import datetime
-from functools import wraps
 from typing import AsyncIterable, NamedTuple
 
 import evochi.v1.evochi_pb2 as v1
@@ -12,21 +11,6 @@ import grpc.aio as grpc
 import zstandard as zstd
 from google.protobuf import timestamp_pb2
 from grpc import StatusCode
-
-
-def once(fn):
-    """Decorator that ensures a function is only called once."""
-    called = False
-
-    @wraps(fn)
-    def inner(x):
-        nonlocal called
-        if called:
-            return
-        called = True
-        return fn(x)
-
-    return inner
 
 
 class Eval(NamedTuple):
@@ -51,6 +35,7 @@ class Worker[S]:
         self._pop_size: int | None = None
         self._heartbeat_interval: int = 0
         self._current_state: S | None = None
+        self._initialized: bool = False
 
     @property
     def ready(self) -> bool:
@@ -72,7 +57,6 @@ class Worker[S]:
             raise RuntimeError("Worker has not been initialized yet")
         return self._current_state
 
-    @once
     @abstractmethod
     def initialize(self) -> S:
         """Hook that is called for the first worker to initialize the state."""
@@ -151,6 +135,10 @@ class Worker[S]:
         asyncio.create_task(self._keep_alive())  # TODO: is this correct?
 
     async def _handle_init_event(self, event: v1.InitializeEvent) -> None:
+        if self._initialized:
+            logging.warning("Received init event but worker is already initialized")
+            return
+        self._initialized = True
         logging.debug("Received init event with task id %s", event.task_id)
         state = self.initialize()
         self._current_state = state

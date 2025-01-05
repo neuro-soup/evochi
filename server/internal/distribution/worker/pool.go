@@ -21,6 +21,10 @@ var (
 		Name: "worker_pool_workers_removed",
 		Help: "The total number of workers removed from the pool.",
 	})
+	workers = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "worker_pool_workers",
+		Help: "The total number of workers in the pool.",
+	})
 )
 
 type Pool struct {
@@ -64,6 +68,7 @@ func (p *Pool) Add(w *Worker) {
 	p.pool[w.ID] = w
 
 	workersAdded.Inc()
+	workers.Set(float64(len(p.pool)))
 }
 
 // Remove removes the worker from the pool.
@@ -80,6 +85,7 @@ func (p *Pool) remove(w *Worker) {
 	workersRemoved.Inc()
 
 	w.Remove()
+	workers.Set(float64(len(p.pool)))
 }
 
 func (p *Pool) Workers() []*Worker {

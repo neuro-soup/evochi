@@ -15,6 +15,13 @@ type Config struct {
 	// JWTPrivateKey is the private key to use for JWT tokens.
 	JWTSecret string
 
+	// JWTExpiry is the expiry time for JWT tokens. Defaults to 30 days.
+	JWTExpiry time.Duration
+
+	// MaxSlicesPerEval is the maximum number of slices to send per evaluation.
+	// Defaults to 0, meaning there is no limit.
+	MaxSlicesPerEval uint
+
 	// MaxWorkers is the maximum number of workers to start. If zero, there is
 	// no limit.
 	MaxWorkers uint
@@ -61,7 +68,7 @@ func (h *Handler) reset() {
 // eval tries to assign slices to the worker.
 func (h *Handler) eval(w *worker.Worker) {
 	// try to assign slices to the worker
-	assigned := h.epoch.Assign(w)
+	assigned := h.epoch.Assign(w, h.cfg.MaxSlicesPerEval)
 	if len(assigned) == 0 {
 		// no tasks to assign, worker is idle
 		slog.Debug("no slices assigned, worker is idle", "worker", w.ID)

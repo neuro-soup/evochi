@@ -20,6 +20,13 @@ type config struct {
 	// JWTSecret is the secret to use for JWT tokens.
 	JWTSecret string `split_words:"true" required:"true"`
 
+	// JWTExpiry is the expiry time for JWT tokens. Defaults to 30 days.
+	JWTExpiry time.Duration `split_words:"true" default:"720h"`
+
+	// MaxSlicesPerEval is the maximum number of slices to send per evaluation.
+	// Defaults to 0, meaning there is no limit.
+	MaxSlicesPerEval uint `split_words:"true" default:"0"`
+
 	// WorkerTimeout is the timeout for a worker. Defaults to 1 minute.
 	WorkerTimeout time.Duration `split_words:"true" default:"1m"`
 

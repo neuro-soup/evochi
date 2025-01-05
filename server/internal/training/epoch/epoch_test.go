@@ -16,7 +16,7 @@ func TestEpoch_Assign(t *testing.T) {
 
 		e.unassigned.Clear()
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Empty(assigned)
 	})
@@ -27,7 +27,7 @@ func TestEpoch_Assign(t *testing.T) {
 		e := New(1, 10, nil)
 		w := newWorker(10)
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Len(assigned, 1)
 		r.EqualValues(0, assigned[0].Start)
@@ -42,7 +42,7 @@ func TestEpoch_Assign(t *testing.T) {
 		e := New(1, 5, nil)
 		w := newWorker(5)
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Len(assigned, 1)
 		r.EqualValues(0, assigned[0].Start)
@@ -57,7 +57,7 @@ func TestEpoch_Assign(t *testing.T) {
 		e := New(1, 10, nil)
 		w := newWorker(5)
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Len(assigned, 1)
 		r.EqualValues(0, assigned[0].Start)
@@ -84,7 +84,7 @@ func TestEpoch_Assign(t *testing.T) {
 			End:   10,
 		})
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Len(assigned, 2)
 		r.EqualValues(7, assigned[0].Start)
@@ -111,7 +111,7 @@ func TestEpoch_Assign(t *testing.T) {
 			End:   10,
 		})
 
-		assigned := e.Assign(w)
+		assigned := e.Assign(w, 0)
 
 		r.Len(assigned, 2)
 		r.EqualValues(7, assigned[0].Start)

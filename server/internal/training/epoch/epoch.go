@@ -56,7 +56,7 @@ func New(number, population uint, initState eval.State) *Epoch {
 	}
 }
 
-func (e *Epoch) Assign(w worker) []eval.Slice {
+func (e *Epoch) Assign(w worker, maximum uint) []eval.Slice {
 	workerID, workerCores := w.WorkerID(), w.WorkerCores()
 
 	if e.unassigned.Len() == 0 {
@@ -73,7 +73,9 @@ func (e *Epoch) Assign(w worker) []eval.Slice {
 		width  uint
 	)
 
-	for width < workerCores && e.unassigned.Len() > 0 {
+	for width < workerCores && e.unassigned.Len() > 0 &&
+		(maximum == 0 || len(slices) <= int(maximum)) {
+
 		pop := e.unassigned.Pop()
 		delta := pop.End - pop.Start
 

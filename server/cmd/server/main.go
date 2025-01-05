@@ -56,11 +56,13 @@ func registerV1(cfg *config, mux *http.ServeMux, workers *worker.Pool) {
 
 	v1 := v1.New(
 		v1.Config{
-			JWTSecret:      cfg.JWTSecret,
-			MaxWorkers:     cfg.MaxWorkers,
-			WorkerTimeout:  cfg.WorkerTimeout,
-			MaxEpochs:      cfg.MaxEpochs,
-			PopulationSize: cfg.PopulationSize,
+			JWTSecret:        cfg.JWTSecret,
+			JWTExpiry:        cfg.JWTExpiry,
+			MaxSlicesPerEval: cfg.MaxSlicesPerEval,
+			MaxWorkers:       cfg.MaxWorkers,
+			WorkerTimeout:    cfg.WorkerTimeout,
+			MaxEpochs:        cfg.MaxEpochs,
+			PopulationSize:   cfg.PopulationSize,
 		},
 		workers,
 	)

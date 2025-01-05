@@ -10,10 +10,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var epochsCreated = promauto.NewCounter(prometheus.CounterOpts{
-	Name: "epochs_created",
-	Help: "The number of epochs created.",
-})
+var (
+	epochsCreated = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "epochs_created",
+		Help: "The number of epochs created.",
+	})
+	epochsTotalEvalSize = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "epochs_total_eval_size",
+		Help: "The total size that was evaluated.",
+	})
+)
 
 type Epoch struct {
 	// Number is the epoch number.
@@ -93,6 +99,7 @@ func (e *Epoch) Assign(w worker) []eval.Slice {
 		}
 		if second.Start != second.End {
 			e.unassigned.Push(second)
+			continue
 		}
 	}
 
@@ -128,6 +135,7 @@ func (e *Epoch) Reward(w worker, evals []eval.Eval) error {
 		for i := eval.Slice.Start; i < eval.Slice.End; i++ {
 			e.rewards[i] += eval.Rewards[i-eval.Slice.Start]
 		}
+		epochsTotalEvalSize.Add(float64(width))
 	}
 
 	return nil

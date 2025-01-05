@@ -1,24 +1,52 @@
+from __future__ import annotations
+
+from typing import AsyncIterable, NamedTuple
+from abc import ABC, abstractmethod
+
 import asyncio
 import logging
 import pickle
-from abc import abstractmethod
 from datetime import datetime
-from typing import AsyncIterable, NamedTuple
+
+import grpc.aio as grpc
+from google.protobuf import timestamp_pb2
+from grpc import StatusCode
+import zstandard as zstd
 
 import evochi.v1.evochi_pb2 as v1
 import evochi.v1.evochi_pb2_grpc as client
-import grpc.aio as grpc
-import zstandard as zstd
-from google.protobuf import timestamp_pb2
-from grpc import StatusCode
 
 
 class Eval(NamedTuple):
+    """The evaluated slice and its rewards.
+
+    Note that the len(rewards) must be equal to the length of the slice, which
+    is `slice.stop - slice.start`.
+    """
+
     slice: slice
     rewards: list[float]
 
+    @staticmethod
+    def from_flat(slices: list[slice], rewards: list[float]) -> list[Eval]:
+        """Constructs a list of Eval objects from a list of slices and a list of
+        rewards."""
+        total_width = sum(sl.stop - sl.start for sl in slices)
+        assert total_width == len(rewards), "Number of rewards must match the total width of the slices"
+        evals: list[Eval] = []
+        offset = 0
+        for sl in slices:
+            evals.append(
+                Eval(
+                    slice=slice(sl.start, sl.stop),
+                    rewards=rewards[offset : offset + (sl.stop - sl.start)],
+                )
+            )
+            offset += sl.stop - sl.start
+        return evals
 
-class Worker[S]:
+
+class Worker[S](ABC):
     def __init__(self, channel: grpc.Channel, cores: int) -> None:
         """Initializes the client to interact with the server via the given channel.
 
@@ -37,11 +65,8 @@ class Worker[S]:
         self._current_state: S | None = None
 
     @property
-    def ready(self) -> bool:
-        return self._token is not None
-
-    @property
     def cores(self) -> int:
+        """Returns the number of cores the worker is using."""
         return self._cores
 
     @property
@@ -58,22 +83,28 @@ class Worker[S]:
 
     @abstractmethod
     def initialize(self) -> S:
-        """Hook that is called for the first worker to initialize the state."""
-
-    @abstractmethod
-    def hello(self) -> None:
-        """Hook that is called when the worker received the shared state to initialize from."""
+        """Lifecycle hook that is called for the first worker to initialize the
+        state."""
 
     @abstractmethod
     def evaluate(self, epoch: int, slices: list[slice]) -> list[Eval]:
-        """Hook that is called when the worker should perform an evaluation step."""
+        """Lifecycle hook that is called when the worker should perform an
+        evaluation step."""
 
     @abstractmethod
     def optimize(self, epoch: int, rewards: list[float]) -> S:
-        """Hook that is called when the worker should perform an optimization step."""
+        """Lifecycle hook that is called when the worker should perform an
+        optimization step."""
 
-    def stop(self) -> None:
-        """Hook that is called when the worker should stop."""
+    def on_stop(self, cancel: bool) -> None:
+        """Hook that is called when the worker is requested to stop.
+
+        Args:
+            cancel: Whether the worker's connection has been cancelled.
+        """
+
+    def on_state_change(self, state: S) -> None:
+        """Hook that is called when the worker's state changes."""
 
     async def close(self) -> None:
         """Closes the client's channel."""
@@ -126,22 +157,33 @@ class Worker[S]:
         except grpc.AioRpcError as e:
             if e.code() == StatusCode.CANCELLED:
                 logging.debug("Worker cancelled")
+                self.on_stop(True)
             else:
                 raise e
 
     def _handle_hello_event(self, event: v1.HelloEvent) -> None:
-        logging.debug("Received hello event with id %s and token %s", event.id, event.token)
+        logging.debug(
+            "Received hello event with id %s and token %s",
+            event.id,
+            event.token,
+        )
         self._token = event.token
         self._heartbeat_interval = event.heartbeat_interval
         self._pop_size = event.population_size
+
         self._current_state = self._decompress_state(event.state) if event.state else None
-        self.hello()
-        asyncio.create_task(self._keep_alive())  # TODO: is this correct?
+        if self._current_state is not None:
+            self.on_state_change(self._current_state)
+
+        asyncio.create_task(self._keep_alive())
 
     async def _handle_init_event(self, event: v1.InitializeEvent) -> None:
         logging.debug("Received init event with task id %s", event.task_id)
         state = self.initialize()
+
         self._current_state = state
+        self.on_state_change(self._current_state)
+
         await self._finish_initialization(
             v1.FinishInitializationRequest(
                 task_id=event.task_id,
@@ -151,18 +193,27 @@ class Worker[S]:
 
     async def _handle_eval_event(self, event: v1.EvaluateEvent) -> None:
         logging.debug("Received eval event with task id %s", event.task_id)
-        evals = self.evaluate(epoch=event.epoch, slices=[slice(sl.start, sl.end) for sl in event.slices])
+        evals = self.evaluate(event.epoch, [slice(sl.start, sl.end) for sl in event.slices])
         await self._finish_evaluation(
             v1.FinishEvaluationRequest(
                 task_id=event.task_id,
-                evaluations=[v1.Evaluation(slice=sl, rewards=e.rewards) for sl, e in zip(event.slices, evals)],
+                evaluations=[
+                    v1.Evaluation(
+                        slice=v1.Slice(start=e.slice.start, end=e.slice.stop),
+                        rewards=e.rewards,
+                    )
+                    for e in evals
+                ],
             )
         )
 
     async def _handle_optimize_event(self, event: v1.OptimizeEvent) -> None:
         logging.debug("Received optimize event with task id %s", event.task_id)
-        optimized = self.optimize(epoch=event.epoch, rewards=list(event.rewards))
+        optimized = self.optimize(event.epoch, list(event.rewards))
+
         self._current_state = optimized
+        self.on_state_change(optimized)
+
         await self._finish_optimization(v1.FinishOptimizationRequest(task_id=event.task_id))
 
     async def _handle_share_state_event(self, event: v1.ShareStateEvent) -> None:
@@ -177,7 +228,7 @@ class Worker[S]:
 
     async def _handle_stop_event(self, event: v1.StopEvent) -> None:
         logging.debug("Received stop event with task id %s", event.task_id)
-        self.stop()
+        self.on_stop(False)
 
     def _subscribe(self, request: v1.SubscribeRequest) -> AsyncIterable[v1.SubscribeResponse]:
         logging.debug("Subscribing to events")
@@ -219,4 +270,4 @@ class Worker[S]:
         return [("authorization", f"Bearer {self._token}")]
 
 
-__all__ = ["Worker"]
+__all__ = ["Worker", "Eval"]

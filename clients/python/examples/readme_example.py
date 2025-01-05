@@ -1,36 +1,3 @@
-# Evochi Python Client
-
-<div align="center">
-    <img src="https://img.shields.io/badge/Written_In-Python-f7d44f?style=for-the-badge&logo=python" alt="Python" />
-</div>
-
-<br />
-
-This project provides an easy-to-use Python client for the Evochi API such that
-users don't have to worry about the low-level networking details of the API protocol.
-
-## Installation
-
-Install the package from PyPI:
-
-```bash
-pip install evochi
-```
-
-Or, if you want to install from (Git) source:
-
-```bash
-pip install "evochi @ git+https://github.com/neuro-soup/evochi.git/#subdirectory=clients/python"
-```
-
-## Basic Usage
-
-### Minimal Example
-
-The following example is a minimal example of how to use the Evochi Python
-client. It is assumed that the Evochi server is running on `localhost:8080`.
-
-```py
 from dataclasses import dataclass
 import random
 
@@ -84,10 +51,7 @@ class AwesomeWorker(evochi.Worker[State]):
         return [
             evochi.Eval(
                 slice=slice,
-                rewards=[
-                    random.randint(-42, 42)
-                    for _ in range(slice.start, slice.stop)
-                ],
+                rewards=[random.randint(-42, 42) for _ in range(slice.start, slice.stop)],
             )
             for slice in slices
         ]
@@ -116,4 +80,3 @@ async def main() -> None:
     worker = AwesomeWorker(channel=channel, cores=5)
 
     await worker.start()
-```

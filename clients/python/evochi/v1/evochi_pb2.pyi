@@ -37,9 +37,7 @@ class Slice(_message.Message):
     END_FIELD_NUMBER: _ClassVar[int]
     start: int
     end: int
-    def __init__(
-        self, start: _Optional[int] = ..., end: _Optional[int] = ...
-    ) -> None: ...
+    def __init__(self, start: _Optional[int] = ..., end: _Optional[int] = ...) -> None: ...
 
 class Evaluation(_message.Message):
     __slots__ = ("slice", "rewards")
@@ -48,30 +46,31 @@ class Evaluation(_message.Message):
     slice: Slice
     rewards: _containers.RepeatedScalarFieldContainer[float]
     def __init__(
-        self,
-        slice: _Optional[_Union[Slice, _Mapping]] = ...,
-        rewards: _Optional[_Iterable[float]] = ...,
+        self, slice: _Optional[_Union[Slice, _Mapping]] = ..., rewards: _Optional[_Iterable[float]] = ...
     ) -> None: ...
 
 class HelloEvent(_message.Message):
-    __slots__ = ("id", "token", "population_size", "heartbeat_interval", "state")
+    __slots__ = ("id", "token", "state", "population_size", "heartbeat_interval", "max_epochs")
     ID_FIELD_NUMBER: _ClassVar[int]
     TOKEN_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
     POPULATION_SIZE_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_INTERVAL_FIELD_NUMBER: _ClassVar[int]
-    STATE_FIELD_NUMBER: _ClassVar[int]
+    MAX_EPOCHS_FIELD_NUMBER: _ClassVar[int]
     id: str
     token: str
+    state: bytes
     population_size: int
     heartbeat_interval: int
-    state: bytes
+    max_epochs: int
     def __init__(
         self,
         id: _Optional[str] = ...,
         token: _Optional[str] = ...,
+        state: _Optional[bytes] = ...,
         population_size: _Optional[int] = ...,
         heartbeat_interval: _Optional[int] = ...,
-        state: _Optional[bytes] = ...,
+        max_epochs: _Optional[int] = ...,
     ) -> None: ...
 
 class EvaluateEvent(_message.Message):
@@ -98,10 +97,7 @@ class OptimizeEvent(_message.Message):
     epoch: int
     rewards: _containers.RepeatedScalarFieldContainer[float]
     def __init__(
-        self,
-        task_id: _Optional[str] = ...,
-        epoch: _Optional[int] = ...,
-        rewards: _Optional[_Iterable[float]] = ...,
+        self, task_id: _Optional[str] = ..., epoch: _Optional[int] = ..., rewards: _Optional[_Iterable[float]] = ...
     ) -> None: ...
 
 class InitializeEvent(_message.Message):
@@ -116,9 +112,7 @@ class ShareStateEvent(_message.Message):
     EPOCH_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     epoch: int
-    def __init__(
-        self, task_id: _Optional[str] = ..., epoch: _Optional[int] = ...
-    ) -> None: ...
+    def __init__(self, task_id: _Optional[str] = ..., epoch: _Optional[int] = ...) -> None: ...
 
 class StopEvent(_message.Message):
     __slots__ = ("task_id",)
@@ -133,15 +127,7 @@ class SubscribeRequest(_message.Message):
     def __init__(self, cores: _Optional[int] = ...) -> None: ...
 
 class SubscribeResponse(_message.Message):
-    __slots__ = (
-        "type",
-        "hello",
-        "evaluate",
-        "optimize",
-        "initialize",
-        "share_state",
-        "stop",
-    )
+    __slots__ = ("type", "hello", "evaluate", "optimize", "initialize", "share_state", "stop")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     HELLO_FIELD_NUMBER: _ClassVar[int]
     EVALUATE_FIELD_NUMBER: _ClassVar[int]
@@ -174,9 +160,7 @@ class HeartbeatRequest(_message.Message):
     seq_id: int
     timestamp: _timestamp_pb2.Timestamp
     def __init__(
-        self,
-        seq_id: _Optional[int] = ...,
-        timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
+        self, seq_id: _Optional[int] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...
     ) -> None: ...
 
 class HeartbeatResponse(_message.Message):
@@ -192,9 +176,7 @@ class FinishEvaluationRequest(_message.Message):
     task_id: str
     evaluations: _containers.RepeatedCompositeFieldContainer[Evaluation]
     def __init__(
-        self,
-        task_id: _Optional[str] = ...,
-        evaluations: _Optional[_Iterable[_Union[Evaluation, _Mapping]]] = ...,
+        self, task_id: _Optional[str] = ..., evaluations: _Optional[_Iterable[_Union[Evaluation, _Mapping]]] = ...
     ) -> None: ...
 
 class FinishEvaluationResponse(_message.Message):
@@ -221,9 +203,7 @@ class FinishInitializationRequest(_message.Message):
     STATE_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     state: bytes
-    def __init__(
-        self, task_id: _Optional[str] = ..., state: _Optional[bytes] = ...
-    ) -> None: ...
+    def __init__(self, task_id: _Optional[str] = ..., state: _Optional[bytes] = ...) -> None: ...
 
 class FinishInitializationResponse(_message.Message):
     __slots__ = ("ok",)
@@ -237,9 +217,7 @@ class FinishShareStateRequest(_message.Message):
     STATE_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     state: bytes
-    def __init__(
-        self, task_id: _Optional[str] = ..., state: _Optional[bytes] = ...
-    ) -> None: ...
+    def __init__(self, task_id: _Optional[str] = ..., state: _Optional[bytes] = ...) -> None: ...
 
 class FinishShareStateResponse(_message.Message):
     __slots__ = ("ok",)

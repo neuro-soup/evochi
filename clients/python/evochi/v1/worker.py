@@ -61,6 +61,7 @@ class Worker[S](ABC):
         self._closed = False
         self._token: str | None = None
         self._pop_size: int | None = None
+        self._max_epochs: int | None = None
         self._heartbeat_interval: int = 0
         self._current_state: S | None = None
 
@@ -74,6 +75,12 @@ class Worker[S](ABC):
         if self._pop_size is None:
             raise RuntimeError("Worker has not been initialized yet")
         return self._pop_size
+
+    @property
+    def max_epochs(self) -> int:
+        if self._max_epochs is None:
+            raise RuntimeError("Worker has not been initialized yet")
+        return self._max_epochs
 
     @property
     def state(self) -> S:
@@ -170,6 +177,7 @@ class Worker[S](ABC):
         self._token = event.token
         self._heartbeat_interval = event.heartbeat_interval
         self._pop_size = event.population_size
+        self._max_epochs = event.max_epochs
 
         self._current_state = self._decompress_state(event.state) if event.state else None
         if self._current_state is not None:

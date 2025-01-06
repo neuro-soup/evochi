@@ -88,9 +88,10 @@ func (h *Handler) greet(
 			Hello: &evochiv1.HelloEvent{
 				Id:                w.ID.String(),
 				Token:             tok,
+				State:             state,
 				PopulationSize:    int32(h.populationSize()),
 				HeartbeatInterval: int32((h.cfg.WorkerTimeout / 2).Seconds()),
-				State:             state,
+				MaxEpochs:         int32(h.cfg.MaxEpochs),
 			},
 		},
 	})

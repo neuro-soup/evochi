@@ -39,16 +39,19 @@ message HelloEvent {
   // as `Authorization: Bearer <token>` to the server to authenticate itself.
   string token = 2;
 
+  // the initial state of the worker, where the encoding value is up to the
+  // workers. if nil, the worker is the first one to join the work force.
+  optional bytes state = 3;
+
   // total population size
-  int32 population_size = 3;
+  int32 population_size = 4;
 
   // the heartbeat interval in seconds in which the worker sends heartbeats to
   // the server.
-  int32 heartbeat_interval = 4;
+  int32 heartbeat_interval = 5;
 
-  // the initial state of the worker, where the encoding value is up to the
-  // workers. if nil, the worker is the first one to join the work force.
-  optional bytes state = 5;
+  // the maximum number of epochs. if zero, the training will run forever.
+  int32 max_epochs = 6;
 }
 
 // the server requests the worker to evaluate a slice

@@ -5,3 +5,6 @@
 *.pem
 
 dist/
+
+# nix 
+result

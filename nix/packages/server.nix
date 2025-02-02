@@ -4,17 +4,17 @@
 }:
 pkgs.buildGoModule {
   pname = "evochi";
-  version = pkgs.lib.fileContents ../version;
+  version = pkgs.lib.fileContents ../../version;
 
   src = pkgs.lib.fileset.toSource {
-    root = ../server;
+    root = ../../server;
     fileset = pkgs.lib.fileset.unions [
-      ../server/go.mod
-      ../server/go.sum
+      ../../server/go.mod
+      ../../server/go.sum
 
-      ../server/cmd
-      ../server/internal
-      ../server/pkg
+      ../../server/cmd
+      ../../server/internal
+      ../../server/pkg
     ];
   };
   subPackages = [ "cmd/server" ];

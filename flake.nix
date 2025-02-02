@@ -1,24 +1,34 @@
 {
   description = "evochi";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
   };
-
   outputs =
-    { nixpkgs, utils, ... }:
-    utils.lib.eachDefaultSystem (
+    {
+      self,
+      nixpkgs,
+      utils,
+      ...
+    }:
+    (utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        devShells.default = import ./nix/shell.nix { inherit pkgs; };
+        devShells = {
+          default = pkgs.callPackage ./nix/shell.nix { };
+        };
 
         packages = {
-          server = import ./nix/packages/server.nix { inherit pkgs; };
+          server = pkgs.callPackage ./nix/packages/server.nix { };
         };
       }
-    );
+    ))
+    // {
+      nixosModules = {
+        server = import ./nix/nixosModules/server.nix self;
+      };
+    };
 }

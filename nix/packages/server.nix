@@ -1,14 +1,15 @@
 {
-  pkgs,
+  buildGoModule,
+  lib,
   ...
 }:
-pkgs.buildGoModule {
+buildGoModule {
   pname = "evochi";
-  version = pkgs.lib.fileContents ../../version;
+  version = lib.fileContents ../../version;
 
-  src = pkgs.lib.fileset.toSource {
+  src = lib.fileset.toSource {
     root = ../../server;
-    fileset = pkgs.lib.fileset.unions [
+    fileset = lib.fileset.unions [
       ../../server/go.mod
       ../../server/go.sum
 
@@ -27,12 +28,12 @@ pkgs.buildGoModule {
   meta = {
     description = "A distributed training orchestrator inspired by OpenAI's Evolution Strategies paper.";
     homepage = "https://github.com/neuro-soup/evochi";
-    license = pkgs.lib.licenses.mit;
-    maintainers = with pkgs.lib.maintainers; [
+    license = lib.licenses.mit;
+    maintainers = with lib.maintainers; [
       lukasl-dev
       MaxWolf-01
     ];
-    platforms = pkgs.lib.platforms.linux;
+    platforms = lib.platforms.linux;
     mainProgram = "evochi";
   };
 }

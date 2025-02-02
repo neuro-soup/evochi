@@ -1,8 +1,11 @@
 {
-  pkgs ? import <nixpkgs> { },
+  mkShell,
+  lib,
+  pkgs,
+  ...
 }:
 
-pkgs.mkShell rec {
+mkShell rec {
   buildInputs = with pkgs; [
     # go
     go_1_23
@@ -56,6 +59,6 @@ pkgs.mkShell rec {
   ];
 
   shellHook = ''
-    export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath buildInputs}
+    export LD_LIBRARY_PATH=${lib.makeLibraryPath buildInputs}
   '';
 }

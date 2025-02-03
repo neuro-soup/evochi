@@ -1,0 +1,26 @@
+name: Python Publish
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./clients/python
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: latest
+          python-version: 3.12
+      - name: Build package
+        run: uv build
+      - name: Publish to PyPI
+        run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

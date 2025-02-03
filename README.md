@@ -40,6 +40,56 @@ go run github.com/neuro-soup/evochi/cmd/evochi@latest
 EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/cmd/evochi@latest
 ```
 
+<details>
+    <summary>Run with <bold>Nix</bold></summary>
+
+If you are using [Nix](https://nixos.org/), you can use the `nix run` command to run directly from source:
+
+```bash
+nix run "github:neuro-soup/evochi#server"
+```
+
+You can also import the package into your own Nix flake:
+
+```nix
+# flake.nix
+inputs = {
+    evochi.url = "github:neuro-soup/evochi";
+};
+
+# evochi.nix
+{ inputs, pkgs, ... }:
+{
+    environment.systemPackages = [
+        # installs `evochi` binary
+        inputs.evochi.packages.${pkgs.system}.server
+    ];
+}
+```
+
+Alternatively, you can use evochi as Nix module:
+
+```nix
+# flake.nix
+inputs = {
+    evochi.url = "github:neuro-soup/evochi";
+};
+
+# evochi.nix
+{
+    services.evochi = {
+        enable = true;
+        config = {
+            secret.file = ./evochi.secret;
+            training.population = 100;
+        };
+    };
+}
+```
+
+</details>
+
+
 ## (Real-World) Example Implementations
 
 - [es-torch](https://github.com/neuro-soup/es-torch)

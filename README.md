@@ -76,7 +76,12 @@ inputs = {
 };
 
 # evochi.nix
+{ inputs, ... }:
 {
+    imports = [
+        inputs.evochi.nixosModules.server
+    ];
+
     services.evochi = {
         enable = true;
         config = {

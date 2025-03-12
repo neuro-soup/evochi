@@ -13,3 +13,8 @@ proto-gen-python:
     ruff format ./clients/python/evochi/v1/evochi_pb2*
 
 proto-gen: proto-gen-server proto-gen-python
+
+bump version:
+    @echo "Bumping version to {{ version }}"
+    echo {{ version }} > "./version"
+    sed -i "s/^version = .*/version = \"$(echo {{ version }} | sed 's/^v//')\"/" ./clients/python/pyproject.toml

@@ -40,7 +40,7 @@ go run github.com/neuro-soup/evochi/server/cmd/server@latest
 **Full (Minimal) Example:**
 
 ```bash
-EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/cmd/evochi@latest
+EVOCHI_JWT_SECRET="secret" EVOCHI_POPULATION_SIZE=50 go run github.com/neuro-soup/evochi/server/cmd/server@latest
 ```
 
 ## Communication

@@ -74,9 +74,8 @@ class AwesomeWorker(evochi.Worker[State]):
         # for the current worker. The given slices represent the index ranges of
         # the population to be evaluated.
         #
-        # Here, you can perform (an arbitrary number of) environment steps or
-        # whatever you want to evaluate. It is possible that during a single
-        # epoch, the same worker receives multiple evaluation requests.
+        # The total number of individuals across all slices will be <= self.cores.
+        # You should evaluate all these individuals in parallel if possible.
         #
         # Note that the length of the slice (stop-start) must be equal to the
         # number of rewards in a single `evochi.Eval` object.
@@ -117,3 +116,68 @@ async def main() -> None:
 
     await worker.start()
 ```
+
+## Understanding Slice Distribution
+
+When workers connect to the evochi server, they specify their `cores` parameter, which represents their parallel evaluation capacity. The server uses this information to distribute work efficiently:
+
+### How Slices Work
+
+- **Slices** represent contiguous segments of the population (e.g., `slice(0, 5)` means individuals 0-4)
+- Each worker receives one or more slices per evaluation request
+- The total number of individuals across all slices will be `<= cores`
+- Workers should evaluate all assigned individuals in parallel
+
+### Example
+
+If a worker has 8 cores and the unassigned population segments are fragmented:
+```python
+# Worker might receive:
+slices = [slice(0, 3), slice(7, 12)]  # Total: 3 + 5 = 8 individuals
+
+# Worker evaluates all 8 individuals in parallel and returns:
+[
+    Eval(slice(0, 3), [reward0, reward1, reward2]),
+    Eval(slice(7, 12), [reward7, reward8, reward9, reward10, reward11])
+]
+```
+
+### Dynamic Work Distribution
+
+- New workers joining mid-epoch immediately receive available work from the unassigned pool
+- If a worker disconnects, its unfinished slices are redistributed to remaining workers
+- No worker waits idle if there's unassigned work available
+
+## API Reference
+
+### Worker Class
+
+The `Worker` class is the base class for all evochi workers. It handles the communication protocol with the server and provides lifecycle hooks for your implementation.
+
+#### Properties
+
+- `cores` → `int`: Maximum number of individuals to evaluate in a single evaluate call. Usually the number of cores/gpus/... this worker uses for parallel evaluation.
+- `population_size` → `int`: Total population size (available after initialization)
+- `max_epochs` → `int`: Maximum number of epochs (available after initialization)
+- `state` → `S`: Current shared state (available after initialization)
+
+#### Lifecycle Methods (to override)
+
+- `initialize() → S`: Called on the first worker to initialize shared state
+- `evaluate(epoch: int, slices: list[slice]) → list[Eval]`: Called to evaluate population slices
+- `optimize(epoch: int, rewards: list[float]) → S`: Called to perform optimization with full population rewards
+- `on_stop(cancel: bool) → None`: Called when worker is requested to stop (optional)
+- `on_state_change(state: S) → None`: Called when shared state changes (optional)
+
+#### Public Methods
+
+- `async start() → None`: Start the worker and begin processing tasks
+- `async close() → None`: Close the worker's connection
+
+### Eval Class
+
+Represents evaluated slices with their rewards.
+
+- `slice`: The population slice that was evaluated
+- `rewards`: List of rewards for each individual in the slice
+- `from_flat(slices: list[slice], rewards: list[float]) → list[Eval]`: Helper to construct Eval objects from flat reward list

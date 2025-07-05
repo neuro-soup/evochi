@@ -60,6 +60,7 @@ class Worker[S](ABC):
         self._heartbeat_seq_id = 0
         self._closed = False
         self._token: str | None = None
+        self._id: int | None = None
         self._pop_size: int | None = None
         self._max_epochs: int | None = None
         self._heartbeat_interval: int = 0
@@ -69,6 +70,12 @@ class Worker[S](ABC):
     def cores(self) -> int:
         """Returns the number of cores the worker is using."""
         return self._cores
+
+    @property
+    def id(self) -> int:
+        if self._id is None:
+            raise RuntimeError("Worker has not been initialized yet")
+        return self._id
 
     @property
     def population_size(self) -> int:
@@ -90,18 +97,25 @@ class Worker[S](ABC):
 
     @abstractmethod
     def initialize(self) -> S:
-        """Lifecycle hook that is called for the first worker to initialize the
-        state."""
+        """Lifecycle hook that is called for the first worker to initialize the state."""
 
     @abstractmethod
     def evaluate(self, epoch: int, slices: list[slice]) -> list[Eval]:
-        """Lifecycle hook that is called when the worker should perform an
-        evaluation step."""
+        """Lifecycle hook that is called when the worker should perform an evaluation step.
+
+        Args:
+            epoch: The current epoch / generation.
+            slices: List of population slices to evaluate. Usually a single slice.
+                The total number of individuals across all slices will be <= self.cores.
+
+        Returns:
+            List of Eval objects, one per slice, containing the rewards for each individual in that slice.
+            The number of rewards in each Eval must exactly match the slice size (slice.stop - slice.start).
+        """
 
     @abstractmethod
     def optimize(self, epoch: int, rewards: list[float]) -> S:
-        """Lifecycle hook that is called when the worker should perform an
-        optimization step."""
+        """Lifecycle hook that is called when the worker should perform an optimization step."""
 
     def on_stop(self, cancel: bool) -> None:
         """Hook that is called when the worker is requested to stop.
@@ -174,6 +188,7 @@ class Worker[S](ABC):
             event.id,
             event.token,
         )
+        self._id = event.id
         self._token = event.token
         self._heartbeat_interval = event.heartbeat_interval
         self._pop_size = event.population_size

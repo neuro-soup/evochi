@@ -73,9 +73,7 @@ class AwesomeWorker(evochi.Worker[State]):
         # This method is called whenever the server requests an evaluation step
         # for the current worker. The given slices represent the index ranges of
         # the population to be evaluated.
-        #
         # The total number of individuals across all slices will be <= self.cores.
-        # You should evaluate all these individuals in parallel if possible.
         #
         # Note that the length of the slice (stop-start) must be equal to the
         # number of rewards in a single `evochi.Eval` object.
@@ -126,7 +124,6 @@ When workers connect to the evochi server, they specify their `cores` parameter,
 - **Slices** represent contiguous segments of the population (e.g., `slice(0, 5)` means individuals 0-4)
 - Each worker receives one or more slices per evaluation request
 - The total number of individuals across all slices will be `<= cores`
-- Workers should evaluate all assigned individuals in parallel
 
 ### Example
 

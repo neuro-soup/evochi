@@ -60,7 +60,7 @@ class Worker[S](ABC):
         self._heartbeat_seq_id = 0
         self._closed = False
         self._token: str | None = None
-        self._id: int | None = None
+        self._id: str | None = None
         self._pop_size: int | None = None
         self._max_epochs: int | None = None
         self._heartbeat_interval: int = 0
@@ -72,7 +72,7 @@ class Worker[S](ABC):
         return self._cores
 
     @property
-    def id(self) -> int:
+    def id(self) -> str:
         if self._id is None:
             raise RuntimeError("Worker has not been initialized yet")
         return self._id

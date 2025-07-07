@@ -1,6 +1,6 @@
 [project]
 name = "evochi"
-version = "0.1.2"
+version = "0.1.3"
 description = "The client implementation for the Evochi project."
 readme = "README.md"
 requires-python = ">=3.12"
